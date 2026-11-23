@@ -1,0 +1,44 @@
+# Variables de entorno y secretos locales
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.Python
+.venv/
+venv/
+env/
+backend/.venv/
+backend/venv/
+*.sqlite3
+backend/staticfiles/
+backend/media/
+
+# Node / Frontend / Pruebas
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+playwright/.cache/
+
+# Logs y caché de herramientas
+*.log
+.ruff_cache/
+.import_linter_cache/
+.eslintcache
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
