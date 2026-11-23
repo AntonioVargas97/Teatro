@@ -1,0 +1,46 @@
+@startuml ME01_Cotizacion_Arrendamiento
+hide empty description
+skinparam state {
+  BackgroundColor #F8FAFC
+  BorderColor #1E293B
+  ArrowColor #334155
+}
+
+[*] --> EN_REVISION : Solicitud enviada\n[sin choque en agenda]
+
+state EN_REVISION {
+  [*] --> EN_TIEMPO
+  EN_TIEMPO --> ATRASADA : > 5 días hábiles\nsin respuesta Admin
+}
+
+EN_REVISION --> EXPIRADA_POR_FECHA : Pasó fecha estimada\nsin resolución [Celery]
+EN_REVISION --> RECHAZADA : Admin rechaza solicitud
+EN_REVISION --> PROPUESTA_RETENIDA : Admin propone <= 3 fechas\n[retiene por 48h]
+EN_REVISION --> PRE_RESERVADO : Admin aprueba monto\n[congela snapshot esquema\ny habilita pago 48h]
+
+PROPUESTA_RETENIDA --> PROPUESTA_EXPIRADA : Vencen 48h o\nsolicitante rechaza\n/ libera fechas
+PROPUESTA_RETENIDA --> EN_REVISION : Solicitante acepta 1 fecha\n/ libera las otras 2,\nmantiene elegida retenida
+
+PRE_RESERVADO --> CONFIRMADO : Pago acreditado <= 48h\n[anticipo 50% o total 100%]
+PRE_RESERVADO --> EXPIRADA_SIN_PAGO : Vencen 48h sin pago\n/ libera agenda
+PRE_RESERVADO --> PAGO_EXTEMPORANEO_EN_REVISION : Webhook Stripe tardío\n[fecha aún libre]
+PRE_RESERVADO --> EXPIRADA_SIN_PAGO : Webhook Stripe tardío\n[fecha ya ocupada]\n/ reembolso auto 100%
+
+PAGO_EXTEMPORANEO_EN_REVISION --> CONFIRMADO : Admin acepta <= 72h
+PAGO_EXTEMPORANEO_EN_REVISION --> RECHAZADA_EXTEMPORANEA : Admin rechaza o vencen 72h\n/ reembolso 100%
+
+CONFIRMADO --> CANCELADO_POR_ARRENDATARIO : Solicitud usuario +\nregistro Admin\n/ aplica tabla retención
+CONFIRMADO --> CANCELADO_POR_TEATRO : Fuerza mayor / Teatro\n/ invalida QRs y detiene venta
+CONFIRMADO --> REPROGRAMADO : Cambio atómico de fecha\n[>= 21d gratis o por Teatro]
+CONFIRMADO --> FINALIZADO : Concluye última fecha\ndel arrendamiento
+
+EXPIRADA_POR_FECHA --> [*]
+RECHAZADA --> [*]
+PROPUESTA_EXPIRADA --> [*]
+EXPIRADA_SIN_PAGO --> [*]
+RECHAZADA_EXTEMPORANEA --> [*]
+CANCELADO_POR_ARRENDATARIO --> [*]
+CANCELADO_POR_TEATRO --> [*]
+REPROGRAMADO --> [*]
+FINALIZADO --> [*]
+@enduml

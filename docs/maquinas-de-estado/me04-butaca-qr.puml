@@ -1,0 +1,28 @@
+@startuml ME04_Butaca_QR
+hide empty description
+skinparam state {
+  BackgroundColor #F8FAFC
+  BorderColor #1E293B
+  ArrowColor #334155
+}
+
+state "Inventario de BUTACA (por Función)" as But {
+  [*] --> DISPONIBLE : Función inicializada
+  DISPONIBLE --> APARTADA : Selección en Web o Taquilla\n[bloqueo 10 min]
+  APARTADA --> DISPONIBLE : Carrito expira o se cancela
+  APARTADA --> VENDIDA : Orden PAGADA
+
+  DISPONIBLE --> BLOQUEO_TECNICO : Admin inhabilita asiento\n[mantenimiento / silla ruedas]
+  BLOQUEO_TECNICO --> DISPONIBLE : Admin retira bloqueo
+
+  DISPONIBLE --> CORTESIA : Admin/Cajero emite cortesía\n[costo $0.00, sin cuenta]
+  CORTESIA --> DISPONIBLE : Admin revoca cortesía\n[antes del ingreso]
+}
+
+state "Ciclo de Vida del BOLETO QR" as QR {
+  [*] --> EMITIDO : Orden PAGADA o CORTESIA emitida
+  EMITIDO --> USADO : Escaneo válido en puerta\n[hora_inicio - 2h <= now() <= hora_fin]
+  EMITIDO --> USADO_CONTINGENCIA : Reconciliación en lote\ntras Modo Contingencia
+  EMITIDO --> INVALIDADO : Cancelación evento / revocación
+}
+@enduml

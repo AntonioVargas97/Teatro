@@ -1,0 +1,34 @@
+@startuml ME02_Evento_Funcion
+hide empty description
+skinparam state {
+  BackgroundColor #F8FAFC
+  BorderColor #1E293B
+  ArrowColor #334155
+}
+
+state "Ciclo de Vida del EVENTO" as Ev {
+  [*] --> PENDIENTE_PUBLICACION : Arrendamiento CONFIRMADO\no Evento Directo creado
+  PENDIENTE_PUBLICACION --> PUBLICADO : Cumple póster + tarifas\n[antes de D-15]
+  PENDIENTE_PUBLICACION --> VENCIDO_SIN_PUBLICAR : Llega D-15 sin requisitos\n[Celery Beat]
+
+  VENCIDO_SIN_PUBLICAR --> PUBLICADO : Admin captura datos o\nconcede prórroga y cumple
+  VENCIDO_SIN_PUBLICAR --> OPERACION_SIN_CARTELERA : Admin autoriza operar\nsin venta web / difusión
+  VENCIDO_SIN_PUBLICAR --> CANCELADO_EVENTO : Admin cancela\n[aplica política 2.9]
+
+  PUBLICADO --> CANCELADO_EVENTO : Cancelación Teatro /\nincumplimiento D-21
+  PUBLICADO --> FINALIZADO_EVENTO : Todas sus funciones\nconcluyen
+  OPERACION_SIN_CARTELERA --> FINALIZADO_EVENTO : Funciones concluyen
+}
+
+state "Ciclo Operativo por FUNCIÓN" as Fn {
+  [*] --> PROGRAMADA : Función creada\n[con hora_inicio y hora_fin]
+  PROGRAMADA --> VENTA_ACTIVA : Evento PUBLICADO\n[tipo Comercial]
+  VENTA_ACTIVA --> VENTA_WEB_CERRADA : now() >= hora_inicio - 30m\n[taquilla física sigue abierta]
+  VENTA_WEB_CERRADA --> VENTA_CERRADA_TOTAL : now() >= hora_inicio
+  VENTA_ACTIVA --> PUERTA_ABIERTA : now() >= hora_inicio - 2h\n[habilita escáner QR]
+  VENTA_WEB_CERRADA --> PUERTA_ABIERTA : now() >= hora_inicio - 2h
+  PUERTA_ABIERTA --> CONCLUIDA : now() > hora_fin\n[cierra escáner QR]
+  VENTA_ACTIVA --> CANCELADA_FUNCION : Evento cancelado
+  VENTA_WEB_CERRADA --> CANCELADA_FUNCION : Evento cancelado
+}
+@enduml
