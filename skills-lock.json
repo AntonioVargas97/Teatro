@@ -8,6 +8,13 @@
       "skillPath": "skills/frontend-design/SKILL.md",
       "computedHash": "83485963700bcf11d5bf78118facb301676b69d918fee2e45a95e7f1a2840f6c"
     },
+    "git-workflow": {
+      "source": "Mindrally/skills",
+      "commit": "7682ca77710e0971eab4e0ae5dddfa281aea0ba5",
+      "sourceType": "github",
+      "skillPath": "git-workflow/SKILL.md",
+      "computedHash": "3ac76bde8c6dc079f1597705ccb5f64c0d487511e71c76422e1e8d189a2c3e85"
+    },
     "security-audit": {
       "source": "cloudflare/security-audit-skill",
       "commit": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8",
