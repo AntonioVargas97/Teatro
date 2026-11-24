@@ -1,0 +1,55 @@
+---
+name: react-teatro-frontend
+description: "Architecture, API contract, seat-map polling, QR scanner, Stripe Elements, SPA performance, and UI conventions for the React 18 + TypeScript + Vite + Tailwind frontend of Teatro de la Ciudad de Coatzacoalcos. Use this skill whenever creating, editing, or reviewing files in frontend/src/ (pages, components, AuthContext, ProtectedRoute, api/client.ts, vite.config.ts, or Tailwind styles)."
+---
+
+# React + TypeScript Frontend Guide (Teatro Coatzacoalcos)
+
+Follow these architectural, performance, and UI conventions when working in `frontend/`. For full specs, consult `docs/arquitectura.md`, `docs/stack-tecnologico.md`, and `docs/alcance.md`.
+
+## 1. Layout, Routing & Auth Guards
+
+- Keep feature pages grouped under `frontend/src/features/` (`usuarios`, `admin`, `cartelera`, `inventario`, `ventas`, `boletos`, `cotizaciones`), shared UI in `components/`, HTTP client in `api/client.ts`, and Tailwind entry in `styles/global.css`.
+- **Client routing (`react-router-dom` v6):** `ProtectedRoute.tsx` is strictly a UX guard; real RBAC and anti-IDOR authorization live in Django `permissions.py`.
+- **Preserve seat selection on login redirect:** If an anonymous `Visitante` selects a seat on the map, redirect to login/register, preserve `funcion_id` and chosen seats in `AuthContext.tsx` (in-memory/session state), and restore them after authentication.
+- **Responsive baseline:** Design every view (`ValidarAccesoPage.tsx`, `ConfiguradorTarifas.tsx`, `MapaAsientos.tsx`, `AdminAgendaSolicitudesPage.tsx`) to operate cleanly down to **`360px` width** (iOS Safari and Android Chrome) with Tailwind CSS and `lucide-react` icons.
+
+## 2. API Client, Sessions & Formatting (`src/api/client.ts`)
+
+- **Fetch wrapper only:** Use native `fetch` with `credentials: "include"`, `X-CSRFToken` header on mutating requests, and relative `/api/v1/` paths (proxied by Vite in `vite.config.ts` to Django under the same origin).
+- **Uniform error handling:** Parse `{ code, message, details }` from 4xx/5xx responses and handle `401` (unauthenticated), `403` (forbidden), `409 Conflict` (seat taken, schedule clash, closed sale, duplicate QR), and `422` (outside QR time window).
+- **Formatting:** Format dates in **`America/Mexico_City`** and currency in **`MXN`** exclusively with native **`Intl.DateTimeFormat`** and **`Intl.NumberFormat`**. Do not use floating-point math for totals/subtotals when avoidable.
+
+## 3. SPA Performance & Re-render Rules
+
+- **Eliminate request waterfalls:** Fetch independent endpoints concurrently with `Promise.all(...)` (e.g., event detail + seat availability + pricing sections).
+- **Lazy-load heavy feature routes:** Use `React.lazy` + `Suspense` for heavy optional views (`@fullcalendar/react` in `AdminAgendaSolicitudesPage.tsx`, `html5-qrcode` in `ValidarAccesoPage.tsx`) to keep the public cartelera bundle fast.
+- **O(1) lookups on 1,728 seats:** Index seat statuses and selected seats in `Map` / `Set` keyed by `butaca_id` instead of calling `.find()` / `.includes()` inside loops over 1,728 nodes.
+- **Keep `React.memo` effective:** Pass primitive props (status string, selected boolean, price) and stable callbacks (`useCallback` + functional `setState(prev => ...)`); avoid inline object/array literals on memoized seat components and never declare components inside other components.
+- **Derived state & effects:** Compute derived values (totals, counts, remaining seats, button disabled flags) directly during render—never mirror them in `useEffect` + `useState`. Use lazy `useState(() => ...)` for expensive initial computations and ternary (`cond ? <A /> : null`) instead of `count && <A />` for numeric conditionals.
+
+## 4. Feature-Specific Conventions
+
+- **1,728-Seat Map (`SeleccionButacasPage.tsx`, `MapaAsientos.tsx`, `TaquillaPanel.tsx`):**
+  - Synchronize real-time availability via lightweight HTTP **polling every 10–15s** (automatically paused when `document.visibilityState !== "visible"`).
+  - Visually distinguish all 5 states (`disponible`, `apartada`, `vendida`, `bloqueo_tecnico`, `cortesia`) plus wheelchair/companion accessible seats.
+- **Tariff Configurator (`ConfiguradorTarifas.tsx`):** Enforce `<= 6` sub-sections per official section, contiguous row/column blocks in tiered seating, whole cabins only in `Palcos`, unique `{Sección} - {Nombre}` labels, and `>= $100.00 MXN` floor price.
+- **Online Checkout & Cart (`CarritoPage.tsx`):** Single-function cart, visible 10-minute countdown, warning before clearing active cart on function switch, and **Stripe Elements** (`@stripe/react-stripe-js`, `@stripe/stripe-js`) for card payments—never touch raw card data.
+- **QR Validation & Tickets (`ValidarAccesoPage.tsx`, `MisBoletosPage.tsx`):**
+  - Use **`html5-qrcode`** (`MediaDevices.getUserMedia()`) with a manual short-folio input directly below the camera viewfinder and display exact server messages (*Acceso permitido*, *Abre a las HH:MM*, *La función ya terminó*, *Boleto de la función DD/MM HH:MM*, *Ya ingresó a las HH:MM*, *Boleto no válido*).
+  - Test mobile camera locally over HTTPS (`@vitejs/plugin-basic-ssl` or tunnel). Render digital ticket QRs with **`qrcode.react`**.
+- **Admin Calendar (`AdminAgendaSolicitudesPage.tsx`):** Use **`@fullcalendar/react`** (`daygrid`, `timegrid`, `interaction`) to display `FUNCION`, `RENTA`, `MANTENIMIENTO`, `PROPUESTA_RETENIDA`, and `PRE_RESERVADO` blocks.
+- **Static assets (`public/carteles/`):** Reserve strictly for static build placeholders (e.g. `sin-poster.jpg`); dynamic event posters load from `/media/`.
+
+## 5. Excluded Libraries (Do Not Introduce)
+
+Never add or use: `axios`, `redux`, `@reduxjs/toolkit`, `moment`, `dayjs`, `swr`, `socket.io-client`, `vite-plugin-pwa`, `workbox`, or localStorage JWT auth tokens.
+
+## 6. Verification Commands (from `frontend/`)
+
+```powershell
+npm run typecheck     # tsc --noEmit
+npm run lint          # eslint .
+npm run format:check  # prettier --check .
+npm test              # vitest run
+```
