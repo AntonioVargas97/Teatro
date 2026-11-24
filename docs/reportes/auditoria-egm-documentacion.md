@@ -26,7 +26,7 @@
 
 ### [C-05] `[RESUELTO]` Fórmulas del cotizador multi-día, esquema D-21 y geometría de `ConfiguradorTarifas`
 * **Ubicación:** `docs/alcance.md` (§2.3, §2.5, §3.4, §3.10) y `docs/arquitectura.md` (Entidades Nucleares, Módulos, Pruebas y Patrones).
-* **Resolución aplicada:** Se fijó unidad de cobro configurable por ítem (`POR_EVENTO`, `POR_DIA`, `POR_TURNO`, `POR_UNIDAD`) para extras/infraestructura; ensayos y montaje incluidos en precio al rentar más de 1 día o más de 1 función el mismo día (solo reservan agenda); precios netos finales en MXN sin IVA adicional; esquema `50/50` permitido con `>= 21 d` (`100%` obligatorio con `< 21 d`, corte en `D-21 23:59:59`, anticipo redondeado `ROUND_HALF_UP` y `saldo = total - anticipo`); y sub-secciones representadas como bloques rectangulares `(fila_inicio, fila_fin, col_inicio, col_fin)` en graderías + cabinas completas `palco_ids` en `Palcos` (dejando el catálogo físico exacto de las 1,728 butacas para `docs/modelo-datos.md`).
+* **Resolución aplicada:** Se fijó unidad de cobro configurable por ítem (`POR_EVENTO`, `POR_DIA`, `POR_TURNO`, `POR_UNIDAD`) para extras/infraestructura; ensayos y montaje incluidos en precio al rentar más de 1 día o más de 1 función el mismo día (solo reservan agenda); precios netos finales en MXN sin IVA adicional; esquema `50/50` permitido con `> 30 d` (`100%` obligatorio con `<= 30 d`, corte en `D-21 23:59:59` con margen de `9 d`, anticipo redondeado `ROUND_HALF_UP` y `saldo = total - anticipo`); y sub-secciones representadas como bloques rectangulares `(fila_inicio, fila_fin, col_inicio, col_fin)` en graderías + cabinas completas `palco_ids` en `Palcos` (dejando el catálogo físico exacto de las 1,728 butacas para `docs/modelo-datos.md`).
 
 ---
 

@@ -37,8 +37,8 @@ Todas las reglas temporales, cierres y días naturales se evalúan bajo **`Ameri
 - **Pre-reserva:** al aprobar monto oficial, entra en `PRE_RESERVADO` por **48 h naturales** (plazo único tanto para tarjeta como para generación y liquidación de ficha Stripe).
 - **Extras e infraestructura:** precios base netos en MXN (sin IVA adicional) y unidad de cobro **configurable por ítem** (`POR_EVENTO`, `POR_DIA`, `POR_TURNO`, `POR_UNIDAD`).
 - **Esquema 50/50 vs 100% (snapshot al aprobar respecto a la 1ra fecha reservada, incluido montaje/ensayo):**
-  - **`>= 21` días naturales**: **50/50 permitido**; anticipo redondeado a 2 decimales (`ROUND_HALF_UP`) y `saldo = total - anticipo`, venciendo el día **`D-21` a las `23:59:59`**. No se emiten fichas en las últimas **48 h** previas a `D-21 23:59:59` (solo tarjeta).
-  - **`< 21` días naturales**: **100% obligatorio** en un solo pago.
+  - **`> 30` días naturales (`>= 31 d`)**: **50/50 permitido** (corte `D-21` + margen de `9 d`); anticipo redondeado a 2 decimales (`ROUND_HALF_UP`) y `saldo = total - anticipo`, venciendo el día **`D-21` a las `23:59:59`**. No se emiten fichas en las últimas **48 h** previas a `D-21 23:59:59` (solo tarjeta).
+  - **`<= 30` días naturales (`30 d` o menos)**: **100% obligatorio** en un solo pago.
   - **Incumplimiento en `D-21`:** `ADMIN` suspende/cancela evento, detiene venta, invalida QRs, conserva historial para devoluciones manuales, libera agenda explícitamente y el anticipo no se reembolsa.
 - **Pagos extemporáneos (tras vencer 48 h o tras D-21):**
   - Fecha aún libre (solo pre-reserva inicial) → `PAGO_EXTEMPORANEO_EN_REVISION` (**72 h naturales** para que `ADMIN` acepte o rechace con devolución del 100%).
