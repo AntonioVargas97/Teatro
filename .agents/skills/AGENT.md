@@ -13,3 +13,5 @@ Este repositorio usa skills complementarias bajo `.agents/skills/`. Cuando dos g
    - En trabajo cotidiano aplica en modo guía (respaldando RBAC, anti-IDOR, cookies `HttpOnly`/CSRF y firmas de Stripe/QR); solo ejecuta el flujo completo de auditoría cuando el usuario lo solicite explícitamente.
 4. **Control de versiones (`git-workflow`):**
    - Usa Conventional Commits y commits atómicos. Mientras el repositorio siga en etapa de configuración sobre `main`, **pregunta antes de commitear en `main`** salvo que el usuario ya indique explícitamente la rama destino.
+5. **Reportes de auditoría (`.agents/rules/auditorias-docs.md`):**
+   - Toda auditoría nueva debe guardarse en `docs/reportes/<tipo-auditoria>/auditoria-[nombreDescriptivo]-[fecha].md` separada por tipo (`egm/`, `seguridad/`, `codigo/`, etc.).
