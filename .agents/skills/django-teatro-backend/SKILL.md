@@ -59,8 +59,8 @@ apps/<modulo>/
   - Seat reservation / checkout / release (`LocalidadFuncion` / `OrdenCompra`): use `select_for_update()` (or `NOWAIT` + deterministic ordering to prevent deadlocks) and return `409 Conflict` on contention.
   - QR gate scan (`Boleto`): evaluate atomically inside `transaction.atomic()` (`select_for_update()` or conditional `UPDATE ... WHERE estado = 'EMITIDO'`) so concurrent scans yield one `200 OK` and `409 Conflict` for duplicates.
   - Agenda overlap: rely on `AgendaService` transactions + PostgreSQL `ExclusionConstraint` (`btree_gist`) on half-open `[inicio, fin)` ranges where `estado != 'LIBERADO'`.
-- **Timezones:** Persist `TIMESTAMPTZ` in **UTC**; evaluate all business deadlines (`30m` web close, `0m` box office close, `10m + 5m` cart, `48h` pre-reserve/alternatives, `72h` late payment, `D-21 23:59:59`, `D-15`, `[hora_inicio - 2h, hora_fin]` QR window) deterministically in **`America/Mexico_City`** using `zoneinfo` + `tzdata`. Never call external time APIs.
-- **Money:** Use `Decimal(10, 2)` (`MXN`), never `float`. Enforce commercial floor `>= $100.00 MXN` per sub-section.
+- **Timezones:** Persist `TIMESTAMPTZ` in **UTC**; evaluate all business deadlines (`30m` web close, `0m` box office close, `10m + 5m` cart, `48h` pre-reserve/alternatives, `72h` late payment, `D-21 23:59:59`, `min(inicio_primer_bloque, max(primera_fecha - 15d, fecha_pago + 3d))`, `[hora_inicio - 2h, hora_fin]` QR window) deterministically in **`America/Mexico_City`** using `zoneinfo` + `tzdata`. Never call external time APIs.
+- **Money:** Use `Decimal(10, 2)` (`MXN`, net final prices without extra VAT), never `float`. Enforce commercial floor `>= $100.00 MXN` per sub-section; in `50/50` (`>= 21d`), round advance with `ROUND_HALF_UP` and compute `saldo = total - anticipo`.
 
 ## 5. Stripe, Celery & Document Generation
 

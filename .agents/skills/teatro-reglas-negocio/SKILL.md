@@ -15,15 +15,15 @@ Todas las reglas temporales, cierres y días naturales se evalúan bajo **`Ameri
   - **Público:** cartelera pública informativa, póster obligatorio, bloquea agenda, **sin boletaje ni QR** (el organizador controla acceso físico hasta 1,728 personas).
   - **Privado:** oculto en cartelera pública, sin póster ni boletaje, bloquea agenda.
 - **Orígenes:** `ARRENDAMIENTO` (cotización + pago de `USUARIO`) o `DIRECTO` (alta por `ADMIN` sin cotización ni renta; respeta mismas reglas de agenda, póster y tarifas).
-- **Relación Evento → Funciones:** `1..N` funciones por evento; cada función comercial tiene inventario independiente de 1,728 butacas. Bloques exclusivos de montaje/ensayo reservan agenda sin habilitar venta de boletos.
+- **Relación Evento → Funciones:** `1..N` funciones por evento; cada función comercial tiene inventario independiente de 1,728 butacas. Al rentar más de 1 día o más de 1 función el mismo día, los bloques de montaje/ensayo van incluidos en el precio (solo reservan agenda sin habilitar venta ni costo extra de turno).
 
 ## 2. Sub-secciones, Tarifas, Bloqueos y Cortesías (Comercial)
 
 - **Configurador tarifario:** conservar 6 secciones (1 clic), deshabilitar secciones completas o subdividir en **`<= 6` sub-secciones por sección oficial**:
-  - Graderías: solo cortes por filas completas y/o bloques continuos de columnas.
-  - `Palcos`: solo agrupación de palcos completos (prohibido partir una cabina).
+  - Graderías: bloques rectangulares `(fila_inicio, fila_fin, col_inicio, col_fin)`.
+  - `Palcos`: listas de cabinas completas `palco_ids` (prohibido partir una cabina).
 - **Nomenclatura y unicidad:** etiqueta por defecto `{Sección} - Zona {N}`, editable antes de publicar. Unicidad compuesta **`{Sección} - {Nombre}`** (ej. `Luneta - VIP` y `Palcos - VIP` son válidos; repetir nombre en la misma sección oficial o dejarlo vacío es inválido).
-- **Piso mínimo y congelamiento:** cada sub-sección habilitada exige **`>= $100.00 MXN`**, cubriendo el 100% de las butacas de las secciones habilitadas. Sub-secciones, nombres y tarifas se **congelan al publicar**.
+- **Piso mínimo y congelamiento:** cada sub-sección habilitada exige **`>= $100.00 MXN`** (precios finales netos en MXN sin IVA adicional), cubriendo el 100% de las butacas de las secciones habilitadas. Sub-secciones, nombres y tarifas se **congelan al publicar**.
 - **Acciones post-publicación de `ADMIN` (solo sobre `DISPONIBLE` antes del cierre de taquilla):**
   - **Bloqueo técnico:** inhabilita butaca sin emitir boleto ni QR; reversible.
   - **Cortesía:** `$0.00 MXN` (método `Cortesía`), **sí emite boleto con QR válido**, **exenta del límite de 10 boletos**, no requiere cuenta del invitado y permite registrar beneficiario/motivo opcional.
@@ -34,14 +34,15 @@ Todas las reglas temporales, cierres y días naturales se evalúan bajo **`Ameri
 - **Revisión y SLA:** `EN_REVISION` no bloquea agenda. SLA objetivo: **3 días hábiles** primera respuesta; alerta de atraso **> 5 días hábiles**; cierre automático `EXPIRADA_POR_FECHA` si pasa la fecha estimada.
 - **Fechas alternativas:** `ADMIN` puede proponer hasta **3 opciones** (`PROPUESTA_RETENIDA` por **48 h naturales**). Aceptar 1 libera las otras 2; rechazar o vencer 48 h pasa a `PROPUESTA_EXPIRADA`. Sin chat interno.
 - **Pre-reserva:** al aprobar monto oficial, entra en `PRE_RESERVADO` por **48 h naturales** (plazo único tanto para tarjeta como para generación y liquidación de ficha Stripe).
+- **Extras e infraestructura:** precios base netos en MXN (sin IVA adicional) y unidad de cobro **configurable por ítem** (`POR_EVENTO`, `POR_DIA`, `POR_TURNO`, `POR_UNIDAD`).
 - **Esquema 50/50 vs 100% (snapshot al aprobar respecto a la 1ra fecha reservada, incluido montaje/ensayo):**
-  - **`>= 28` días naturales** (`21 d` corte + `7 d` margen): **50/50 permitido**; el 50% restante vence el día **`D-21` a las `23:59:59`**. No se emiten fichas en las últimas **48 h** previas a `D-21 23:59:59` (solo tarjeta).
-  - **`< 28` días naturales**: **100% obligatorio** en una exhibición.
+  - **`>= 21` días naturales**: **50/50 permitido**; anticipo redondeado a 2 decimales (`ROUND_HALF_UP`) y `saldo = total - anticipo`, venciendo el día **`D-21` a las `23:59:59`**. No se emiten fichas en las últimas **48 h** previas a `D-21 23:59:59` (solo tarjeta).
+  - **`< 21` días naturales**: **100% obligatorio** en un solo pago.
   - **Incumplimiento en `D-21`:** `ADMIN` suspende/cancela evento, detiene venta, invalida QRs, conserva historial para devoluciones manuales, libera agenda explícitamente y el anticipo no se reembolsa.
-- **Pagos extemporáneos (tras vencer 48 h):**
-  - Fecha aún libre → `PAGO_EXTEMPORANEO_EN_REVISION` (**72 h naturales** para que `ADMIN` acepte o rechace con reembolso del 100%).
-  - Fecha ya ocupada → **reembolso técnico automático del 100%** (la no reembolsabilidad del anticipo no aplica a desfases bancarios).
-- **Límite de publicación:** tras pago inicial, el solicitante tiene **3 días** para cargar póster/tarifas (recordatorios a los **3 d** y cada **7 d**). Fecha límite por defecto: **`D-15`** (o **3 d** tras pago si faltaba `< 15 d`). Al vencer pasa a `VENCIDO_SIN_PUBLICAR` (agenda sigue bloqueada hasta resolución explícita de `ADMIN`).
+- **Pagos extemporáneos (tras vencer 48 h o tras D-21):**
+  - Fecha aún libre (solo pre-reserva inicial) → `PAGO_EXTEMPORANEO_EN_REVISION` (**72 h naturales** para que `ADMIN` acepte o rechace con devolución del 100%).
+  - Fecha ya ocupada (o saldo tardío tras incumplir `D-21`) → **devolución íntegra del 100%**: reembolso técnico automático API para **tarjeta**, o estado `REEMBOLSO_BANCARIO_PENDIENTE` para **fichas SPEI/efectivo** (la no reembolsabilidad no aplica a desfases bancarios).
+- **Límite de publicación:** tras pago inicial, el solicitante tiene **3 días** para cargar póster/tarifas (recordatorios a los **3 d** y cada **7 d**). Fecha límite determinista: **`min(inicio_primer_bloque_reservado, max(primera_fecha - 15d, fecha_pago + 3d))`** (eventos `Privado` pasan directo a `OPERACION_SIN_CARTELERA`). Al vencer pasa a `VENCIDO_SIN_PUBLICAR` (agenda sigue bloqueada hasta resolución explícita de `ADMIN`).
 
 ## 4. Compra de Boletos, Carrito, Taquilla y Acceso QR
 

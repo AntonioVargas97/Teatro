@@ -33,7 +33,7 @@ Follow these architectural, performance, and UI conventions when working in `fro
 - **1,728-Seat Map (`SeleccionButacasPage.tsx`, `MapaAsientos.tsx`, `TaquillaPanel.tsx`):**
   - Synchronize real-time availability via lightweight HTTP **polling every 10–15s** (automatically paused when `document.visibilityState !== "visible"`).
   - Visually distinguish all 5 states (`disponible`, `apartada`, `vendida`, `bloqueo_tecnico`, `cortesia`) plus wheelchair/companion accessible seats.
-- **Tariff Configurator (`ConfiguradorTarifas.tsx`):** Enforce `<= 6` sub-sections per official section, contiguous row/column blocks in tiered seating, whole cabins only in `Palcos`, unique `{Sección} - {Nombre}` labels, and `>= $100.00 MXN` floor price.
+- **Tariff Configurator (`ConfiguradorTarifas.tsx`):** Enforce `<= 6` sub-sections per official section, rectangular blocks `(fila_inicio, fila_fin, col_inicio, col_fin)` in tiered seating, complete `palco_ids` only in `Palcos`, unique `{Sección} - {Nombre}` labels, and net final `>= $100.00 MXN` floor price.
 - **Online Checkout & Cart (`CarritoPage.tsx`):** Single-function cart, visible 10-minute countdown, warning before clearing active cart on function switch, and **Stripe Elements** (`@stripe/react-stripe-js`, `@stripe/stripe-js`) for card payments—never touch raw card data.
 - **QR Validation & Tickets (`ValidarAccesoPage.tsx`, `MisBoletosPage.tsx`):**
   - Use **`html5-qrcode`** (`MediaDevices.getUserMedia()`) with a manual short-folio input directly below the camera viewfinder and display exact server messages (*Acceso permitido*, *Abre a las HH:MM*, *La función ya terminó*, *Boleto de la función DD/MM HH:MM*, *Ya ingresó a las HH:MM*, *Boleto no válido*).

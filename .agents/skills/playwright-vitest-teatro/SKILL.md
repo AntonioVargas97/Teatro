@@ -18,7 +18,7 @@ Follow these testing, mocking, concurrency, and CI conventions across `backend/`
   ```
 
 ### Unit & Integration Tests (`TestCase`)
-- Test business transitions in `services.py` (`<= 6` sub-sections, `>= $100.00 MXN`, single-function cart, `30m`/`0m` closes, `50/50` vs `100%` at `28d`, `D-21` balance cutoff, `$0.00` courtesies, PDF/CSV exports, cancellations/reschedules, late-payment auto-refunds).
+- Test business transitions in `services.py` (`<= 6` sub-sections, `>= $100.00 MXN`, single-function cart, `30m`/`0m` closes, `50/50` vs `100%` at `21d`/`D-21`, `$0.00` courtesies, PDF/CSV exports, cancellations/reschedules, late-payment auto-refunds vs `REEMBOLSO_BANCARIO_PENDIENTE`).
 - Test RBAC and anti-IDOR rules in `permissions.py` across all 4 roles (`ADMIN`, `CAJERO`, `VERIFICADOR`, `USUARIO`) and anonymous `Visitante` (`401`/`403` verification on cross-user resources).
 - **Stripe & time mocking:** Mock `PaymentGateway` / `StripeAdapter` with `unittest.mock` in unit tests so tests run offline. Test webhook idempotency by replaying the same `stripe_event_id` and verifying `200 OK` without duplicate tickets or refunds. Simulate time progression by patching `django.utils.timezone.now` or using explicit DB `TIMESTAMPTZ` timestamps (do not add external time-mocking dependencies).
 
