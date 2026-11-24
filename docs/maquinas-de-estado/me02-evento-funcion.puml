@@ -7,28 +7,46 @@ skinparam state {
 }
 
 state "Ciclo de Vida del EVENTO" as Ev {
-  [*] --> PENDIENTE_PUBLICACION : Arrendamiento CONFIRMADO\no Evento Directo creado
-  PENDIENTE_PUBLICACION --> PUBLICADO : Cumple póster + tarifas\n[antes de D-15]
-  PENDIENTE_PUBLICACION --> VENCIDO_SIN_PUBLICAR : Llega D-15 sin requisitos\n[Celery Beat]
+  [*] --> PENDIENTE_PUBLICACION : Arrendamiento CONFIRMADO\no Evento Directo [Comercial / Público]
+  [*] --> OPERACION_SIN_CARTELERA : Arrendamiento CONFIRMADO\no Evento Directo [modalidad Privado]
 
-  VENCIDO_SIN_PUBLICAR --> PUBLICADO : Admin captura datos o\nconcede prórroga y cumple
-  VENCIDO_SIN_PUBLICAR --> OPERACION_SIN_CARTELERA : Admin autoriza operar\nsin venta web / difusión
-  VENCIDO_SIN_PUBLICAR --> CANCELADO_EVENTO : Admin cancela\n[aplica política 2.9]
+  PENDIENTE_PUBLICACION --> PUBLICADO : Póster (+ tarifas >= $100 si Comercial)\n+ aprobación final ADMIN\n[<= fecha_limite_publicacion]
+  PENDIENTE_PUBLICACION --> VENCIDO_SIN_PUBLICAR : now() > min(inicio_1er_bloque,\nmax(1ra_fecha - 15d, fecha_pago + 3d))\n[Celery Beat]
+  PENDIENTE_PUBLICACION --> CANCELADO_POR_ARRENDATARIO : Cancelación / incumple D-21
+  PENDIENTE_PUBLICACION --> CANCELADO_POR_TEATRO : Cancelación Teatro / Directo
 
-  PUBLICADO --> CANCELADO_EVENTO : Cancelación Teatro /\nincumplimiento D-21
-  PUBLICADO --> FINALIZADO_EVENTO : Todas sus funciones\nconcluyen
-  OPERACION_SIN_CARTELERA --> FINALIZADO_EVENTO : Funciones concluyen
+  VENCIDO_SIN_PUBLICAR --> PUBLICADO : Admin apoya (1) o concede\nprórroga (2) y aprueba
+  VENCIDO_SIN_PUBLICAR --> OPERACION_SIN_CARTELERA : Admin autoriza operar\nsin venta web / cartelera (3)
+  VENCIDO_SIN_PUBLICAR --> CANCELADO_POR_ARRENDATARIO : Admin cancela arrendamiento (4)
+  VENCIDO_SIN_PUBLICAR --> CANCELADO_POR_TEATRO : Admin cancela Evento Directo (4)
+
+  PUBLICADO --> CANCELADO_POR_ARRENDATARIO : Cancelación arrendatario / D-21
+  PUBLICADO --> CANCELADO_POR_TEATRO : Cancelación Teatro
+  PUBLICADO --> FINALIZADO : Todas sus funciones concluyen
+
+  OPERACION_SIN_CARTELERA --> CANCELADO_POR_ARRENDATARIO : Cancelación arrendatario / D-21
+  OPERACION_SIN_CARTELERA --> CANCELADO_POR_TEATRO : Cancelación Teatro
+  OPERACION_SIN_CARTELERA --> FINALIZADO : Todas sus funciones concluyen
 }
 
-state "Ciclo Operativo por FUNCIÓN" as Fn {
-  [*] --> PROGRAMADA : Función creada\n[con hora_inicio y hora_fin]
-  PROGRAMADA --> VENTA_ACTIVA : Evento PUBLICADO\n[tipo Comercial]
-  VENTA_ACTIVA --> VENTA_WEB_CERRADA : now() >= hora_inicio - 30m\n[taquilla física sigue abierta]
-  VENTA_WEB_CERRADA --> VENTA_CERRADA_TOTAL : now() >= hora_inicio
-  VENTA_ACTIVA --> PUERTA_ABIERTA : now() >= hora_inicio - 2h\n[habilita escáner QR]
-  VENTA_WEB_CERRADA --> PUERTA_ABIERTA : now() >= hora_inicio - 2h
-  PUERTA_ABIERTA --> CONCLUIDA : now() > hora_fin\n[cierra escáner QR]
-  VENTA_ACTIVA --> CANCELADA_FUNCION : Evento cancelado
-  VENTA_WEB_CERRADA --> CANCELADA_FUNCION : Evento cancelado
+--
+
+state "Ciclo Administrativo por FUNCIÓN" as Fn {
+  [*] --> PROGRAMADA : Función creada dentro de BloqueoAgenda\n[con fecha, hora_inicio, hora_fin, inicio_en, fin_en UTC]
+
+  PROGRAMADA --> REPROGRAMADO : Admin reprograma fecha/horario\n[operación atómica en AgendaService;\nEvento permanece PUBLICADO y QRs vigentes]
+  PROGRAMADA --> CANCELADA : Evento cancelado
+  REPROGRAMADO --> CANCELADA : Evento cancelado
+  PROGRAMADA --> CONCLUIDA : now() > fin_en
+  REPROGRAMADO --> CONCLUIDA : now() > fin_en
+
+  note right of Fn
+    Las ventanas operativas (solo Comercial en PUBLICADO) se evalúan
+    determinísticamente en services.py sobre inicio_en / fin_en (UTC):
+    * Venta web: now() < inicio_en - 30 min
+    * Taquilla física: now() < inicio_en - 0 min
+    * Acceso QR en puerta: inicio_en - 2h <= now() <= fin_en
+    * Modo contingencia: bandera modo_contingencia_activo (<= 24h antes)
+  end note
 }
 @enduml

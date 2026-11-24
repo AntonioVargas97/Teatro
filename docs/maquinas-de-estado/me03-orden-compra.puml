@@ -6,24 +6,26 @@ skinparam state {
   ArrowColor #334155
 }
 
-[*] --> APARTADO : Selecciona 1ra butaca libre\n[inicia reloj único 10 min\n+ bloquea butacas]
+[*] --> APARTADO : 1ra butaca DISPONIBLE [función única]\n[web: now() < inicio_en - 30m | taquilla: < inicio_en;\n<= 10 boletos acumulados; expira_en = +10m]
 
-APARTADO --> APARTADO : Agrega/quita butaca\n[<= 10 boletos, sin reiniciar reloj]
-APARTADO --> CANCELADA_USUARIO : Usuario vacía carrito\no cambia de función\n/ libera butacas
-APARTADO --> EXPIRADA : Vencen 10 min sin iniciar pago\n[Celery Beat]\n/ libera butacas
-APARTADO --> PAGO_EN_PROCESO : Usuario inicia cobro Stripe\n(o Cajero confirma en taquilla)\n[extiende gracia +5 min]
+APARTADO --> APARTADO : Agrega/quita butaca misma función\n[<= 10 boletos, sin reiniciar expira_en]
+APARTADO --> EXPIRADA : Vence expira_en, cierre web (-30m),\nusuario vacía/cambia función o Cajero cancela\n/ libera butacas a DISPONIBLE
+APARTADO --> PAGO_EN_PROCESO : Canal LINEA inicia checkout Stripe\n[now() <= expira_en y cierre web -30m vigente]\n/ gracia_hasta = expira_en + 5m
+APARTADO --> PAGADA : Canal TAQUILLA confirma cobro presencial\n[Efectivo o Tarjeta externa; now() < inicio_en]\n/ butacas VENDIDA + emite boletos QR
 
-PAGO_EN_PROCESO --> PAGADA : Webhook Stripe OK (o cobro Cajero)\n[dentro de 10m + 5m gracia]\n/ emite boletos QR
-PAGO_EN_PROCESO --> EXPIRADA : Vence gracia de +5 min sin pago\n/ cancela PaymentIntent Stripe\ny libera butacas
+PAGO_EN_PROCESO --> PAGADA : Webhook Stripe OK [<= gracia_hasta]\n/ butacas VENDIDA + emite boletos QR
+PAGO_EN_PROCESO --> EXPIRADA : Vence gracia_hasta sin confirmación\n/ cancela PaymentIntent y libera butacas
 
-EXPIRADA --> PAGADA : Webhook Stripe tardío OK\n[TODAS las butacas siguen libres]\n/ reasigna y emite boletos QR
-EXPIRADA --> REEMBOLSADA_AUTOMATICA : Webhook Stripe tardío OK\n[>= 1 butaca ya ocupada]\n/ refund 100% vía Stripe + correo
+EXPIRADA --> PAGADA : Webhook Stripe tardío OK\n[now() <= fin_en, función no cancelada,\n100% butacas DISPONIBLE y <= 10 acumulados]\n/ reasigna atómicamente y emite boletos QR
+EXPIRADA --> REEMBOLSADA_AUTOMATICA : Webhook Stripe tardío OK\n[>= 1 butaca ocupada, > 10 acumulados\no función cerrada/cancelada]\n/ refund 100% Stripe + correo
 
-PAGADA --> INVALIDADA_POR_EVENTO : Evento cancelado por Teatro\no incumplimiento D-21
+note right of PAGADA
+  Si el evento se cancela posteriormente,
+  OrdenCompra permanece en PAGADA (integridad contable)
+  y los Boletos pasan a INVALIDADO en ME-04.
+end note
 
-CANCELADA_USUARIO --> [*]
+PAGADA --> [*]
 EXPIRADA --> [*]
 REEMBOLSADA_AUTOMATICA --> [*]
-PAGADA --> [*]
-INVALIDADA_POR_EVENTO --> [*]
 @enduml

@@ -6,23 +6,25 @@ skinparam state {
   ArrowColor #334155
 }
 
-state "Inventario de BUTACA (por Función)" as But {
-  [*] --> DISPONIBLE : Función inicializada
-  DISPONIBLE --> APARTADA : Selección en Web o Taquilla\n[bloqueo 10 min]
-  APARTADA --> DISPONIBLE : Carrito expira o se cancela
-  APARTADA --> VENDIDA : Orden PAGADA
+state "Inventario de DisponibilidadButaca (por Función Comercial)" as But {
+  [*] --> DISPONIBLE : Evento pasa a PUBLICADO\n[bulk_create 1,728 por función]
+  DISPONIBLE --> APARTADA : Selección en Web o Taquilla\n[OrdenCompra APARTADO 10 min]
+  APARTADA --> DISPONIBLE : OrdenCompra EXPIRADA\no cancelación/cierre en Taquilla
+  APARTADA --> VENDIDA : OrdenCompra PAGADA
 
-  DISPONIBLE --> BLOQUEO_TECNICO : Admin inhabilita asiento\n[mantenimiento / silla ruedas]
+  DISPONIBLE --> BLOQUEO_TECNICO : Admin inhabilita asiento\n[sin boleto ni QR]
   BLOQUEO_TECNICO --> DISPONIBLE : Admin retira bloqueo
 
-  DISPONIBLE --> CORTESIA : Admin/Cajero emite cortesía\n[costo $0.00, sin cuenta]
-  CORTESIA --> DISPONIBLE : Admin revoca cortesía\n[antes del ingreso]
+  DISPONIBLE --> CORTESIA : Admin emite cortesía\n[exclusivo ADMIN; $0.00, sin cuenta, exento <= 10]
+  CORTESIA --> DISPONIBLE : Admin revoca cortesía\n[antes del ingreso; invalida QR]
 }
 
+--
+
 state "Ciclo de Vida del BOLETO QR" as QR {
-  [*] --> EMITIDO : Orden PAGADA o CORTESIA emitida
-  EMITIDO --> USADO : Escaneo válido en puerta\n[hora_inicio - 2h <= now() <= hora_fin]
-  EMITIDO --> USADO_CONTINGENCIA : Reconciliación en lote\ntras Modo Contingencia
-  EMITIDO --> INVALIDADO : Cancelación evento / revocación
+  [*] --> EMITIDO : OrdenCompra PAGADA o CORTESIA emitida
+  EMITIDO --> USADO : Escaneo válido en puerta\n[inicio_en - 2h <= now() <= fin_en]
+  EMITIDO --> USADO_CONTINGENCIA : Reconciliación en lote\ntras Modo Contingencia [Admin]
+  EMITIDO --> INVALIDADO : Cancelación evento / incumplimiento D-21\n/ revocación cortesía
 }
 @enduml
