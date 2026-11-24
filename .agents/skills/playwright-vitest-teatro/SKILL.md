@@ -18,15 +18,16 @@ Follow these testing, mocking, concurrency, and CI conventions across `backend/`
   ```
 
 ### Unit & Integration Tests (`TestCase`)
-- Test business transitions in `services.py` (`<= 6` sub-sections, `>= $100.00 MXN`, single-function cart, `30m`/`0m` closes, `50/50` vs `100%` at `21d`/`D-21`, `$0.00` courtesies, PDF/CSV exports, cancellations/reschedules, late-payment auto-refunds vs `REEMBOLSO_BANCARIO_PENDIENTE`).
+- Test business transitions in `services.py` (`<= 6` sub-sections, `>= $100.00 MXN`, single-function `OrdenCompra`, `30m`/`0m` closes blocking `APARTADO -> checkout`, `50/50` vs `100%` at `21d`/`D-21` and reschedule recalc, Mon-Fri SLA, midnight-crossing functions, `bulk_create` of `1,728` rows on `PUBLICADO`, `$0.00` courtesies, PDF/CSV exports and batch contingency reconciliation, cancellations including `CANCELADO_POR_ARRENDATARIO` with sold tickets, late-payment auto-refunds vs `REEMBOLSO_BANCARIO_PENDIENTE`).
 - Test RBAC and anti-IDOR rules in `permissions.py` across all 4 roles (`ADMIN`, `CAJERO`, `VERIFICADOR`, `USUARIO`) and anonymous `Visitante` (`401`/`403` verification on cross-user resources).
 - **Stripe & time mocking:** Mock `PaymentGateway` / `StripeAdapter` with `unittest.mock` in unit tests so tests run offline. Test webhook idempotency by replaying the same `stripe_event_id` and verifying `200 OK` without duplicate tickets or refunds. Simulate time progression by patching `django.utils.timezone.now` or using explicit DB `TIMESTAMPTZ` timestamps (do not add external time-mocking dependencies).
 
 ### Concurrency Tests (`TransactionTestCase`)
 - Always use **`TransactionTestCase`** (never `TestCase`, which wraps each test in an uncommitted outer transaction and masks real row locks across threads).
-- Verify pessimistic row locks (`select_for_update()`) and `ExclusionConstraint` (`btree_gist`) under multi-threaded `threading.Thread` / `ThreadPoolExecutor` contention:
+- Verify pessimistic row locks (`Usuario -> OrdenCompra -> DisponibilidadButaca -> Boleto` with `select_for_update(nowait=True)`) and `ExclusionConstraint` (`btree_gist`) under multi-threaded `threading.Thread` / `ThreadPoolExecutor` contention:
   - Concurrent seat holds on the same seat: exactly 1 succeeds, others get `409 Conflict` (`0%` overselling).
-  - Concurrent QR gate scans on the same ticket: exactly 1 gets `200 OK`, others get `409 Conflict`.
+  - Parallel-tab `<= 10` limit check (`6 + 6 = 12` simultaneous apartados for the same `USUARIO` + `Funcion` fails second with `409 Conflict`, and late-webhook reassignment re-verifies `<= 10`).
+  - Concurrent QR gate scans on the same ticket (`of=('self',)` only on `Boleto`): exactly 1 gets `200 OK`, others get `409 Conflict`.
   - Concurrent agenda reservations on overlapping intervals: `ExclusionConstraint` rejects overlap (`409 Conflict`).
 - Call `connections.close_all()` inside worker threads so PostgreSQL connections clean up properly between runs.
 

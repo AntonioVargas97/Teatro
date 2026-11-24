@@ -7,10 +7,11 @@ description: "Architecture, API contract, seat-map polling, QR scanner, Stripe E
 
 Follow these architectural, performance, and UI conventions when working in `frontend/`. For full specs, consult `docs/arquitectura.md`, `docs/stack-tecnologico.md`, and `docs/alcance.md`.
 
-## 1. Layout, Routing & Auth Guards
+## 1. Dual-SPA Architecture, Routing & Auth Guards (Same-Origin Nginx)
 
-- Keep feature pages grouped under `frontend/src/features/` (`usuarios`, `admin`, `cartelera`, `inventario`, `ventas`, `boletos`, `cotizaciones`), shared UI in `components/`, HTTP client in `api/client.ts`, and Tailwind entry in `styles/global.css`.
-- **Client routing (`react-router-dom` v6):** `ProtectedRoute.tsx` is strictly a UX guard; real RBAC and anti-IDOR authorization live in Django `permissions.py`.
+- **Two separate frontend builds under one origin (`/` and `/gestion/`):** Serve the **Public & Client Portal at `/`** (`cartelera`, seat selection, `OrdenCompra` checkout, `MisBoletos`, quotes/configurator, `USUARIO` auth) and **Internal Operations at `/gestion/`** (`ADMIN` views — including `ContingenciaBoletosPage.tsx` and global sales/audit `AdminVentasAuditoriaPage.tsx` — plus `CAJERO` box office and `VERIFICADOR` mobile QR scanner) so public `/` visitors never download internal staff/admin code while preserving same-origin session cookies + CSRF (`zero CORS/JWT`).
+- Keep build-time shared modules (`MapaAsientos.tsx`, `Button.tsx`, `api/client.ts`) DRY across both apps (`frontend/src/shared/` when split from the initial `features/` scaffold), with feature modules (`usuarios`, `admin`, `cartelera`, `inventario`, `ventas`, `boletos`, `cotizaciones`), and Tailwind entry in `styles/global.css`.
+- **Client routing (`react-router-dom` v6):** `ProtectedRoute.tsx` in both `/` and `/gestion/` is strictly a UX guard; real RBAC and anti-IDOR authorization live in Django `permissions.py`.
 - **Preserve seat selection on login redirect:** If an anonymous `Visitante` selects a seat on the map, redirect to login/register, preserve `funcion_id` and chosen seats in `AuthContext.tsx` (in-memory/session state), and restore them after authentication.
 - **Responsive baseline:** Design every view (`ValidarAccesoPage.tsx`, `ConfiguradorTarifas.tsx`, `MapaAsientos.tsx`, `AdminAgendaSolicitudesPage.tsx`) to operate cleanly down to **`360px` width** (iOS Safari and Android Chrome) with Tailwind CSS and `lucide-react` icons.
 
@@ -32,13 +33,13 @@ Follow these architectural, performance, and UI conventions when working in `fro
 
 - **1,728-Seat Map (`SeleccionButacasPage.tsx`, `MapaAsientos.tsx`, `TaquillaPanel.tsx`):**
   - Synchronize real-time availability via lightweight HTTP **polling every 10–15s** (automatically paused when `document.visibilityState !== "visible"`).
-  - Visually distinguish all 5 states (`disponible`, `apartada`, `vendida`, `bloqueo_tecnico`, `cortesia`) plus wheelchair/companion accessible seats.
+  - Visually distinguish all 5 uppercase seat states (`DISPONIBLE`, `APARTADA`, `VENDIDA`, `BLOQUEO_TECNICO`, `CORTESIA`) plus wheelchair/companion accessible seats.
 - **Tariff Configurator (`ConfiguradorTarifas.tsx`):** Enforce `<= 6` sub-sections per official section, rectangular blocks `(fila_inicio, fila_fin, col_inicio, col_fin)` in tiered seating, complete `palco_ids` only in `Palcos`, unique `{Sección} - {Nombre}` labels, and net final `>= $100.00 MXN` floor price.
-- **Online Checkout & Cart (`CarritoPage.tsx`):** Single-function cart, visible 10-minute countdown, warning before clearing active cart on function switch, and **Stripe Elements** (`@stripe/react-stripe-js`, `@stripe/stripe-js`) for card payments—never touch raw card data.
-- **QR Validation & Tickets (`ValidarAccesoPage.tsx`, `MisBoletosPage.tsx`):**
+- **Online Checkout & Cart (`CarritoPage.tsx`):** Single-function `OrdenCompra`, visible 10-minute countdown, warning before clearing active hold on function switch, and **Stripe Elements** (`@stripe/react-stripe-js`, `@stripe/stripe-js`) for card payments—never touch raw card data.
+- **QR Validation & Tickets (`ValidarAccesoPage.tsx` under `/gestion/`, `MisBoletosPage.tsx` under `/`):**
   - Use **`html5-qrcode`** (`MediaDevices.getUserMedia()`) with a manual short-folio input directly below the camera viewfinder and display exact server messages (*Acceso permitido*, *Abre a las HH:MM*, *La función ya terminó*, *Boleto de la función DD/MM HH:MM*, *Ya ingresó a las HH:MM*, *Boleto no válido*).
   - Test mobile camera locally over HTTPS (`@vitejs/plugin-basic-ssl` or tunnel). Render digital ticket QRs with **`qrcode.react`**.
-- **Admin Calendar (`AdminAgendaSolicitudesPage.tsx`):** Use **`@fullcalendar/react`** (`daygrid`, `timegrid`, `interaction`) to display `FUNCION`, `RENTA`, `MANTENIMIENTO`, `PROPUESTA_RETENIDA`, and `PRE_RESERVADO` blocks.
+- **Admin Calendar, Contingency & Sales/Audit (`AdminAgendaSolicitudesPage.tsx`, `ContingenciaBoletosPage.tsx`, `AdminVentasAuditoriaPage.tsx` under `/gestion/`):** Use **`@fullcalendar/react`** (`daygrid`, `timegrid`, `interaction`) differentiating block **origins** (`FUNCION`, `RENTA`, `MANTENIMIENTO`) from **statuses** (`PROPUESTA_RETENIDA`, `PRE_RESERVADO`, `CONFIRMADO`) when rescheduling without overlaps; place Admin-only contingency export/batch reconciliation and global sales + `RegistroAuditoria` views in `/gestion/` `admin/`.
 - **Static assets (`public/carteles/`):** Reserve strictly for static build placeholders (e.g. `sin-poster.jpg`); dynamic event posters load from `/media/`.
 
 ## 5. Excluded Libraries (Do Not Introduce)

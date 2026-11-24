@@ -12,7 +12,7 @@ Follow these non-negotiable architectural and domain conventions when working in
 The backend is a **modular monolith** under `backend/apps/`:
 
 - **Domain apps:** `usuarios`, `cartelera`, `inventario`, `ventas`, `boletos`, `cotizaciones`
-- **Transversal apps:** `agenda` (venue occupancy) and `auditoria` (immutable audit log)
+- **Transversal apps:** `agenda` (venue occupancy), `configuracion` (`ConfiguracionSistema`, turns, extra/infrastructure catalog), and `auditoria` (immutable audit log)
 
 Standard file layout per domain app (`admin.py` is **omitted**):
 
@@ -32,15 +32,16 @@ apps/<modulo>/
 └── tests/
 ```
 
-### Strict ADP Rules for `apps/agenda/` (Solución B)
-1. **Zero upward/reverse imports:** `apps/agenda/` must **never** import models, serializers, or services from any business module (`cartelera`, `cotizaciones`, `ventas`, etc.). Enforced in CI via `import-linter`.
-2. **Single entry point:** External modules (`cartelera`, `cotizaciones`) must never create or mutate `BloqueoAgenda` directly via ORM; always call `AgendaService` in `apps/agenda/services.py` (`verificar_disponibilidad`, `retener_propuestas`, `pre_reservar_bloque`, `confirmar_bloque`, `reprogramar_bloque`, `liberar_bloque`).
-3. **Semantic neutrality:** `agenda` stores time intervals `[inicio, fin)` in UTC, block origin (`FUNCION`, `RENTA`, `MANTENIMIENTO`), status (`PROPUESTA_RETENIDA`, `PRE_RESERVADO`, `CONFIRMADO`, `LIBERADO`), and a short label—no pricing, posters, or quote logic.
+### Strict ADP Rules for Transversal Apps (`agenda`, `configuracion`, `auditoria`)
+1. **Zero upward/reverse imports:** `apps/agenda/`, `apps/configuracion/`, and `apps/auditoria/` must **never** import models, serializers, or services from any business module (`cartelera`, `cotizaciones`, `ventas`, `inventario`, `boletos`, `usuarios`). Enforced in CI via `import-linter`.
+2. **Single entry point:** External modules (`cartelera`, `cotizaciones`, `ventas`) must never create or mutate `BloqueoAgenda` directly via ORM; always call `AgendaService` in `apps/agenda/services.py` (`verificar_disponibilidad`, `retener_propuestas`, `pre_reservar_bloque`, `confirmar_bloque`, `reprogramar_bloque`, `liberar_bloque`). Read/update system config, turns, and extras via `ConfiguracionService` (`apps/configuracion/`) and apply snapshots in the consuming module.
+3. **Semantic neutrality:** `agenda` stores time intervals `[inicio, fin)` in UTC, block origin (`FUNCION`, `RENTA`, `MANTENIMIENTO`), status (`PROPUESTA_RETENIDA`, `PRE_RESERVADO`, `CONFIRMADO`, `LIBERADO`), and a short label—no pricing, posters, or quote logic. `configuracion` holds editable defaults and catalogs without referencing quotes, events, or orders.
 
 ## 2. Pure REST API, Auth & RBAC (ADR-03, ADR-04, ADR-06)
 
 - **No Django Admin:** `django.contrib.admin` is excluded; never create `admin.py` or `/admin/` routes. All internal operations go through `/api/v1/` backed by `services.py`, `permissions.py`, and `AuditoriaService`.
-- **Sessions over Redis (no JWT, no CORS):** Use Django `SessionAuthentication` (`HttpOnly`, `SameSite=Lax`, CSRF `X-CSRFToken`) and `Argon2PasswordHasher`. Never install `djangorestframework-simplejwt` or `django-cors-headers`.
+- **Sessions over Redis (no JWT, no CORS):** Use Django `SessionAuthentication` (`HttpOnly`, `SESSION_COOKIE_SECURE = not DEBUG`, `SameSite=Lax`, CSRF `X-CSRFToken`, `CSRF_TRUSTED_ORIGINS` env-parameterized for local HTTPS/`@vitejs/plugin-basic-ssl`), `PASSWORD_RESET_TIMEOUT = 1800` (30 min), and `Argon2PasswordHasher`. Never install `djangorestframework-simplejwt` or `django-cors-headers`.
+- **Bootstrap initial staff & catalogs:** Override `UserManager.create_superuser` so `manage.py createsuperuser` assigns `rol = 'ADMIN'` (never expose `/admin/`). Seed fixed billboard categories, 1,728 seats, and defaults via `seed_teatro` / `seed_catalogos` (`seed_demo` is dev-only).
 - **Closed RBAC roles (`TextChoices`):** `ADMIN`, `CAJERO`, `VERIFICADOR`, `USUARIO` (plus anonymous read-only `Visitante`).
 - **Anti-IDOR / BOLA:** Every object lookup or mutation for `USUARIO` in `cartelera` (tenant poster/pricing), `ventas`, `boletos`, and `cotizaciones` must verify ownership (`recurso.usuario_id == request.user.id`) in `permissions.py`.
 - **Filtering & pagination:** Use `django-filter` `FilterSet`, `SearchFilter`, and `OrderingFilter` with `PageNumberPagination` (`PAGE_SIZE = 20`) instead of manual query-param parsing in `views.py`. Return uniform 4xx/5xx JSON (`code`, `message`, `details`).
@@ -49,17 +50,20 @@ apps/<modulo>/
 
 - **Never mutate `estado` directly in views, serializers, Celery tasks, or webhooks.** Encapsulate every transition in explicit `services.py` methods wrapped in `@transaction.atomic`.
 - **Audit trail:** Log sensitive operations (box office sales, quote approvals/rejections/reschedules/cancellations, `VENCIDO_SIN_PUBLICAR` & late-payment resolutions, technical blocks, courtesies, auto-refunds, contingency exports/reconciliation, config changes, staff accounts) via `AuditoriaService`.
-- **Soft delete only:** Never physically delete confirmed `Venta`, `Pago`, `Boleto`, `Cotizacion`, or `BloqueoAgenda` records; transition status instead.
-- **Snapshots:** Config changes (`ConfiguracionSistema`, turn rates, extras/infrastructure) and published event tariffs/sub-sections must be snapshotted so existing quotes, orders, and tickets are never retroactively altered.
+- **Soft delete only:** Never physically delete confirmed `OrdenCompra`, `Pago`, `Boleto`, `Cotizacion`, or `BloqueoAgenda` records; transition status instead.
+- **Snapshots:** Config changes (`ConfiguracionSistema`, turn rates, extras/infrastructure in `apps/configuracion/`) and published event tariffs/sub-sections must be snapshotted so existing quotes, orders, and tickets are never retroactively altered.
 
 ## 4. Concurrency, Database & Timezones (ADR-02, ADR-05, ADR-08)
 
 - **Django ORM migrations are the single source of truth** (`database/*.sql` is reference-only). Seed official 1,728 seats, catalogs, and demo data via `seed_teatro`, `seed_catalogos`, and `seed_demo`.
-- **Row-level pessimistic locking:**
-  - Seat reservation / checkout / release (`LocalidadFuncion` / `OrdenCompra`): use `select_for_update()` (or `NOWAIT` + deterministic ordering to prevent deadlocks) and return `409 Conflict` on contention.
-  - QR gate scan (`Boleto`): evaluate atomically inside `transaction.atomic()` (`select_for_update()` or conditional `UPDATE ... WHERE estado = 'EMITIDO'`) so concurrent scans yield one `200 OK` and `409 Conflict` for duplicates.
-  - Agenda overlap: rely on `AgendaService` transactions + PostgreSQL `ExclusionConstraint` (`btree_gist`) on half-open `[inicio, fin)` ranges where `estado != 'LIBERADO'`.
-- **Timezones:** Persist `TIMESTAMPTZ` in **UTC**; evaluate all business deadlines (`30m` web close, `0m` box office close, `10m + 5m` cart, `48h` pre-reserve/alternatives, `72h` late payment, `D-21 23:59:59`, `min(inicio_primer_bloque, max(primera_fecha - 15d, fecha_pago + 3d))`, `[hora_inicio - 2h, hora_fin]` QR window) deterministically in **`America/Mexico_City`** using `zoneinfo` + `tzdata`. Never call external time APIs.
+- **Global lock hierarchy & pessimistic locking:**
+  - Always acquire row locks in strict order **`Usuario` -> `OrdenCompra` -> `DisponibilidadButaca` ordered by `(funcion_id, butaca_id) ASC` -> `Boleto`** (locking only the minimum required scope).
+  - Seat reservation / checkout (`OrdenCompra` / `DisponibilidadButaca`): use `select_for_update(nowait=True)` in HTTP requests (`409 Conflict` on contention) and `select_for_update(skip_locked=True)` in Celery Beat cleanup tasks.
+  - **Atomic `<= 10` ticket limit:** Lock the `Usuario` row in online flows and sum `(usuario_id, funcion_id)` tickets across `APARTADO + PAGO_EN_PROCESO + PAGADA` (blocking parallel-tab `6 + 6 = 12` bypasses). Also **re-verify `<= 10`** inside the same lock hierarchy before reassigning an `EXPIRADA` order on a late Stripe webhook (trigger automatic 100% refund `REEMBOLSADA_AUTOMATICA` if exceeded).
+  - QR gate scan (`Boleto`): lock only `select_for_update(of=('self',), nowait=True)` inside `transaction.atomic()`, checking `usado_en IS NULL` so concurrent scans across doors never serialize on `Funcion` (`200 OK` vs `409 Conflict`).
+  - Agenda overlap: rely on `AgendaService` (`nowait=True`) + PostgreSQL `ExclusionConstraint` (`btree_gist`) on half-open `[inicio, fin)` ranges where `estado != 'LIBERADO'`.
+- **Naming conventions:** Use Spanish `snake_case` timestamps (`usado_en`, `expira_en`, `gracia_hasta`, `validado_por`, `proximo_recordatorio_en`) and uppercase seat states (`DISPONIBLE`, `APARTADA`, `VENDIDA`, `BLOQUEO_TECNICO`, `CORTESIA`).
+- **Timezones & function lifecycle:** Persist `TIMESTAMPTZ` in **UTC** (`inicio_en`, `fin_en` on `Funcion`, advancing `fin_en` +1 day when `hora_fin <= hora_inicio`); evaluate all business deadlines (`30m` web close / `0m` box office blocking `APARTADO -> checkout`, `10m + 5m` cart, `48h` pre-reserve/alternatives, `72h` late payment, `D-21 23:59:59`, `min(inicio_primer_bloque, max(primera_fecha - 15d, fecha_pago + 3d))`, Mon-Fri business-day SLA, `[inicio_en - 2h, fin_en]` QR window) deterministically in **`America/Mexico_City`** using `zoneinfo` + `tzdata`. Never call external time APIs. Materialize the `1,728` `DisponibilidadButaca` rows via `bulk_create(..., batch_size=1728)` when the Commercial event transitions to `PUBLICADO` (creating initial `Funciones` when lease payment hits `CONFIRMADO`). Recalculate `D-21`/`D-15` on reschedule (requiring `100%` payment first if `< 21d`).
 - **Money:** Use `Decimal(10, 2)` (`MXN`, net final prices without extra VAT), never `float`. Enforce commercial floor `>= $100.00 MXN` per sub-section; in `50/50` (`>= 21d`), round advance with `ROUND_HALF_UP` and compute `saldo = total - anticipo`.
 
 ## 5. Stripe, Celery & Document Generation

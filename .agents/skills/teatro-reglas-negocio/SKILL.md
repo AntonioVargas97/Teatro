@@ -11,11 +11,12 @@ Todas las reglas temporales, cierres y días naturales se evalúan bajo **`Ameri
 
 - **Recinto:** **1,728 butacas** fijas en **6 secciones oficiales** (`Luneta`, `Platea`, `Mezzanine`, `Primer Piso`, `Segundo Piso`, `Palcos`), incluyendo asientos accesibles (silla de ruedas y acompañante).
 - **Modalidades:**
-  - **Comercial:** cartelera pública, póster obligatorio, configuración tarifaria y boletaje completo (mapa 1,728, venta web/taquilla, QR).
-  - **Público:** cartelera pública informativa, póster obligatorio, bloquea agenda, **sin boletaje ni QR** (el organizador controla acceso físico hasta 1,728 personas).
-  - **Privado:** oculto en cartelera pública, sin póster ni boletaje, bloquea agenda.
+  - **Comercial:** cartelera pública, póster obligatorio, configuración tarifaria, aprobación final de `ADMIN` y boletaje completo (mapa 1,728, venta web/taquilla, QR).
+  - **Público:** cartelera pública informativa, póster obligatorio y aprobación final de `ADMIN`, bloquea agenda, **sin boletaje ni QR** (el organizador controla acceso físico hasta 1,728 personas).
+  - **Privado:** oculto en cartelera pública, sin póster ni boletaje, nace directo en `OPERACION_SIN_CARTELERA` y bloquea agenda.
+- **Categorías fijas de cartelera (sembradas en `seed_catalogos`):** `Teatro`, `Música`, `Danza`, `Infantil y Familiar`, `Comedia / Stand-up`, `Conferencia / Institucional`, `Festival / Otros`.
 - **Orígenes:** `ARRENDAMIENTO` (cotización + pago de `USUARIO`) o `DIRECTO` (alta por `ADMIN` sin cotización ni renta; respeta mismas reglas de agenda, póster y tarifas).
-- **Relación Evento → Funciones:** `1..N` funciones por evento; cada función comercial tiene inventario independiente de 1,728 butacas. Al rentar más de 1 día o más de 1 función el mismo día, los bloques de montaje/ensayo van incluidos en el precio (solo reservan agenda sin habilitar venta ni costo extra de turno).
+- **Relación Evento → Funciones:** Al confirmar pago inicial se crean el `Evento` y las `Funciones` iniciales de bloques de función (excluyendo bloques exclusivos de montaje/ensayos); al pasar un evento Comercial a `PUBLICADO` se ejecutan los `bulk_create` de 1,728 `DisponibilidadButaca` por función. Soporta funciones nocturnas que cruzan medianoche (`fin_en` al día siguiente). Al rentar más de 1 día o más de 1 función el mismo día, los bloques de montaje/ensayo van incluidos en el precio (solo reservan agenda sin habilitar venta ni costo extra de turno).
 
 ## 2. Sub-secciones, Tarifas, Bloqueos y Cortesías (Comercial)
 
@@ -31,7 +32,7 @@ Todas las reglas temporales, cierres y días naturales se evalúan bajo **`Ameri
 ## 3. Agenda, Cotizaciones y Arrendamiento
 
 - **Turnos y no traslape:** `Matutino`, `Vespertino`, `Día Completo` (abarca ambos) y soporte multi-día con horarios por día. Intervalos semiabiertos `[inicio, fin)` permiten turnos consecutivos el mismo día sin falso choque.
-- **Revisión y SLA:** `EN_REVISION` no bloquea agenda. SLA objetivo: **3 días hábiles** primera respuesta; alerta de atraso **> 5 días hábiles**; cierre automático `EXPIRADA_POR_FECHA` si pasa la fecha estimada.
+- **Revisión y SLA:** `EN_REVISION` no bloquea agenda. SLA objetivo: **3 días hábiles** primera respuesta; alerta de atraso **> 5 días hábiles** ("días hábiles" = **lunes a viernes**, excluyendo fines de semana bajo `America/Mexico_City`); cierre automático `EXPIRADA_POR_FECHA` si pasa la fecha estimada.
 - **Fechas alternativas:** `ADMIN` puede proponer hasta **3 opciones** (`PROPUESTA_RETENIDA` por **48 h naturales**). Aceptar 1 libera las otras 2; rechazar o vencer 48 h pasa a `PROPUESTA_EXPIRADA`. Sin chat interno.
 - **Pre-reserva:** al aprobar monto oficial, entra en `PRE_RESERVADO` por **48 h naturales** (plazo único tanto para tarjeta como para generación y liquidación de ficha Stripe).
 - **Extras e infraestructura:** precios base netos en MXN (sin IVA adicional) y unidad de cobro **configurable por ítem** (`POR_EVENTO`, `POR_DIA`, `POR_TURNO`, `POR_UNIDAD`).
@@ -46,17 +47,18 @@ Todas las reglas temporales, cierres y días naturales se evalúan bajo **`Ameri
 
 ## 4. Compra de Boletos, Carrito, Taquilla y Acceso QR
 
-- **Portal en línea (`USUARIO`):** cuenta obligatoria (si visitante elige asiento, redirige a login conservando función y selección). **1 carrito activo por usuario y por función única** (cambiar de función advierte y libera el anterior). Reloj único de **10 min** desde el 1er asiento + **5 min** de gracia si está en `PAGO_EN_PROCESO`. Solo tarjeta Stripe; límite **`<= 10` boletos por cuenta y función**; cierre web **`30 min` antes** de `hora_inicio`.
-- **Webhook tardío en boletos (`EXPIRADA`):** si el 100% de las butacas siguen `DISPONIBLE`, reasigna y emite boletos; si al menos 1 ya fue ocupada, ejecuta **reembolso técnico automático del 100%** (`REEMBOLSADA_AUTOMATICA`).
+- **Portal en línea (`USUARIO`):** cuenta obligatoria (si visitante elige asiento, redirige a login conservando función y selección). **1 `OrdenCompra` activa por usuario y por función única** (cambiar de función advierte y libera el apartado anterior). Reloj único de **10 min** (`expira_en`) desde el 1er asiento + **5 min** (`gracia_hasta`) si está en `PAGO_EN_PROCESO`. Solo tarjeta Stripe; límite **`<= 10` boletos acumulados por cuenta y función** sumando `APARTADO + PAGO_EN_PROCESO + PAGADA` (bloqueo atómico en `Usuario`); cierre web **`30 min` antes** de `hora_inicio`.
+- **Webhook tardío en boletos (`EXPIRADA`):** bajo bloqueo global (`Usuario -> OrdenCompra -> DisponibilidadButaca`), si el 100% de las butacas siguen `DISPONIBLE` y reasignar no supera `<= 10` boletos acumulados, reasigna y emite boletos (`PAGADA`); en caso contrario ejecuta **reembolso técnico automático del 100%** (`REEMBOLSADA_AUTOMATICA`).
+- **Cierre independiente por función (`-30m` web / `0m` taquilla):** Al llegar el cierre, las `OrdenCompra` aún en `APARTADO` **no** pueden iniciar `checkout` y expiran; solo continúan en gracia (+5 min) las órdenes ya en `PAGO_EN_PROCESO` antes del cierre.
 - **Taquilla física (`CAJERO`):** sin cuenta de comprador; comparte inventario de 1,728 y apartado de 10 min; pago `Efectivo` o `Tarjeta` (terminal externa); límite **`<= 10` boletos por operación**; cierre **`0 min` antes** (`hora_inicio`).
-- **Validación QR (`VERIFICADOR`):** **100% online**, uso único, evalúa la ventana de la función embebida en el token **`[hora_inicio - 2h, hora_fin]`**. Mensajes exactos: `"Acceso permitido"` (+ sub-sección, fila, asiento), `"Abre a las HH:MM"`, `"La función ya terminó"`, `"Boleto de la función DD/MM HH:MM"`, `"Ya ingresó a las HH:MM"`, `"Boleto no válido"`. Respaldo manual por folio corto; reingreso físico con sello/brazalete.
-- **Modo contingencia:** exportación PDF/CSV auditada desde **`24 h` antes** de la función + activación explícita + reconciliación en lote.
+- **Validación QR (`VERIFICADOR`):** **100% online**, uso único, evalúa la ventana de la función embebida en el token **`[inicio_en - 2h, fin_en]`** (soportando cruce de medianoche). Mensajes exactos: `"Acceso permitido"` (+ sub-sección, fila, asiento), `"Abre a las HH:MM"`, `"La función ya terminó"`, `"Boleto de la función DD/MM HH:MM"`, `"Ya ingresó a las HH:MM"`, `"Boleto no válido"`. Respaldo manual por folio corto; reingreso físico con sello/brazalete.
+- **Modo contingencia:** exportación PDF/CSV (`folio_corto, seccion_subseccion, fila, asiento`) auditada desde **`24 h` antes** de la función + activación explícita (`modo_contingencia_activo`) + reconciliación en lote vía CSV (`folio_corto`) o lista pegada en `ADMIN`.
 
 ## 5. Cancelaciones y Reprogramaciones
 
-- **Cancelación por arrendatario (`CANCELADO_POR_ARRENDATARIO`):** solo pagó 50% → anticipo no reembolsable; pagó 100% y faltan `>= 21 d` → retiene 50%, 50% reembolso externo; pagó 100% y `< 21 d` → sin reembolso. Agenda se libera solo por acción explícita de `ADMIN`.
+- **Cancelación por arrendatario (`CANCELADO_POR_ARRENDATARIO`):** solo pagó 50% → anticipo no reembolsable; pagó 100% y faltan `>= 21 d` → retiene 50%, 50% reembolso externo; pagó 100% y `< 21 d` → sin reembolso. Si ya existen boletos vendidos en evento Comercial, `ADMIN` detiene venta, invalida QRs y conserva historial para devolución externa (bajo acuerdo organizador-teatro). Agenda se libera solo por acción explícita de `ADMIN`.
 - **Cancelación por Teatro (`CANCELADO_POR_TEATRO`):** 100% reembolso externo o reprogramación sin costo; detiene venta, invalida QRs y conserva padrón para devoluciones manuales.
-- **Reprogramación:** 1 cambio sin costo si se solicita con `>= 21 d` y hay agenda libre (`< 21 d` o 2da solicitud cuenta como cancelación + nueva cotización). Funciones con boletos vendidos solo las reprograma `ADMIN` (`REPROGRAMADO`), conservando boletos/QRs vigentes y notificando por correo a cuentas registradas. Siempre atómica en `AgendaService`.
+- **Reprogramación:** 1 cambio sin costo si se solicita con `>= 21 d` y hay agenda libre (`< 21 d` o 2da solicitud cuenta como cancelación + nueva cotización). Recalcula `D-21` y fecha límite de publicación respecto a la nueva fecha; si queda a `< 21 d` de hoy con saldo pendiente, exige liquidar `100%` antes de confirmar. Funciones con boletos vendidos solo las reprograma `ADMIN` (`REPROGRAMADO`), conservando boletos/QRs vigentes y notificando por correo a cuentas registradas. Siempre atómica en `AgendaService`.
 
 ## 6. Exclusiones de Alcance (No Implementar)
 
