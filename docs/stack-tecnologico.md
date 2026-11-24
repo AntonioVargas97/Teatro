@@ -15,7 +15,7 @@ Este documento define las tecnologías base, motores de infraestructura, herrami
 | **Lenguaje Backend** | Python 3.12+ | Ejecución de la API REST, lógica de negocio, generación documental y trabajadores asíncronos. |
 | **Lenguaje y Entorno Frontend** | TypeScript 5.x \+ Node.js 22 LTS | Tipado estático en la SPA y entorno exclusivo de desarrollo local, pruebas y compilación (*build*) del cliente. **No se ejecuta como servidor en el VPS de producción.** |
 | **Base de Datos Relacional** | PostgreSQL 16+ (con extensión btree\_gist) | Persistencia transaccional ACID en UTC, bloqueos SELECT ... FOR UPDATE sobre el inventario de $1,728$ butacas y restricciones ExclusionConstraint sobre TSTZRANGE en la agenda del recinto. |
-| **Almacén en Memoria / Broker** | Redis 7.x | Almacenamiento de sesiones de usuario (HttpOnly), *rate limiting* compartido y *broker* de mensajes para Celery. |
+| **Almacén en Memoria / Broker** | Redis 7.x | Almacenamiento de sesiones de usuario (`HttpOnly`), *rate limiting* y *broker* de mensajes para Celery (`appendonly yes`, `maxmemory-policy noeviction` y bases lógicas separadas `db 0/1/2`). |
 | **Servidor Web y Proxy Inverso** | Nginx 1.24+ | Terminación TLS 1.2/1.3, entrega del *build* estático de React (/), entrega de pósters (/media/) y proxy hacia Gunicorn (/api/v1/). |
 | **Correo Transaccional (SMTP)** | django.core.mail (SMTP nativo) | Envío asíncrono desde Celery Worker hacia un proveedor SMTP transaccional configurado en .env (confirmación de boletos/QR, recuperación de contraseña, recordatorios de $3d$ / $7d$, pre-reservas de $48h$, reprogramaciones y reembolsos técnicos). |
 | **Contenerización** | Docker \+ Docker Compose v2 | Estandarización del entorno local (PostgreSQL, Redis, Django, Celery Worker/Beat y Mailpit) y despliegue reproducible en el VPS. |
@@ -25,7 +25,7 @@ Este documento define las tecnologías base, motores de infraestructura, herrami
 | Herramienta | Entorno | Responsabilidad Operativa |
 | :---- | :---- | :---- |
 | **Mailpit** | Desarrollo local (docker-compose.yml) | Servidor SMTP capturador ligero con interfaz web local para inspeccionar correos transaccionales y enlaces de recuperación sin enviar correos reales. |
-| **Stripe CLI** | Desarrollo local | Reenvío seguro de eventos *webhook* firmados desde **Stripe Sandbox** hacia http\://localhost:8000/api/v1/ventas/webhooks/stripe/. |
+| **Stripe CLI** | Desarrollo local | Reenvío seguro de eventos *webhook* firmados desde **Stripe Sandbox** hacia http\://localhost:8000/api/v1/ventas/webhooks/stripe/ (despacho por `metadata.modulo` hacia ventas y cotizaciones). |
 | **Certbot (Let's Encrypt)** | Producción (VPS) | Emisión y renovación automática de certificados HTTPS (TLS 1.2 y TLS 1.3), habilitando cookies Secure y acceso a cámara móvil para escaneo QR. |
 | **pg\_dump \+ cron** | Producción (VPS) | Respaldos diarios automatizados y comprimidos de PostgreSQL hacia almacenamiento externo cifrado, cumpliendo el objetivo $RPO\leq 24horas$. |
 | **GitHub Actions** | CI/CD (.github/workflows/pruebas.yml) | Ejecución automatizada en cada contribución de Django TestCase, import-linter, ruff, ESLint \+ Prettier, Vitest y pruebas de integración. |
@@ -63,10 +63,10 @@ El backend opera como una **API REST pura** (sin django.contrib.admin) respaldad
 
 | Paquete | Rama Recomendada | Justificación Técnica |
 | :---- | :---- | :---- |
-| stripe | \>=11.0,\<13.0 | SDK oficial encapsulado tras StripeAdapter para crear PaymentIntent (tarjeta en boletaje y tarjeta o fichas SPEI/efectivo en arrendamientos) en **Stripe Sandbox**, ejecutar reembolsos técnicos con llaves de idempotencia y verificar criptográficamente la firma Stripe-Signature de los *webhooks*. |
-| Pillow | \>=10.4,\<12.0 | Requerido por ImageField de Django para validar formato (JPG/PNG/WebP), dimensiones, integridad y peso ($\leq 5MB$) de los pósters subidos a MEDIA\_ROOT. |
+| stripe | \>=11.0,\<13.0 | SDK oficial encapsulado tras StripeAdapter para crear PaymentIntent (tarjeta en boletaje y tarjeta o fichas SPEI/efectivo en arrendamientos, con `metadata.modulo` y llaves de idempotencia), verificar criptográficamente `Stripe-Signature` de los *webhooks*, ejecutar reembolsos técnicos automáticos vía API en pagos con **tarjeta** y registrar seguimiento `REEMBOLSO_BANCARIO_PENDIENTE` cuando una ficha SPEI/efectivo requiera devolución bancaria externa. |
+| Pillow | \>=10.4,\<12.0 | Requerido por ImageField de Django para validar formato (JPG/PNG/WebP), `Image.MAX_IMAGE_PIXELS`, peso ($\leq 5\text{ MB}$) y re-codificar pósters eliminando metadatos EXIF antes de guardar en `MEDIA_ROOT`. |
 | argon2-cffi | \>=23.1,\<25.0 | Algoritmo recomendado de hashing de contraseñas (Argon2PasswordHasher) para proteger las cuentas de usuarios y personal interno. |
-| django-environ | \>=0.11,\<0.13 | Carga tipada de variables de entorno desde .env (credenciales de BD, secretos de Django, REDIS\_URL, parámetros SMTP y llaves de Stripe). |
+| django-environ | \>=0.11,\<0.13 | Carga tipada de variables de entorno desde `.env` (BD, secretos de Django, `QR_HMAC_SECRET`, `CSRF_TRUSTED_ORIGINS`, `REDIS_URL`, SMTP y llaves de Stripe). |
 
 ### **2.5. Generación de Documentos PDF y Exportación**
 
@@ -111,8 +111,8 @@ El frontend es una Single Page Application (SPA) responsiva (operativa desde $36
 | Paquete | Rama Recomendada | Justificación Técnica |
 | :---- | :---- | :---- |
 | typescript | ^5.6.0 | Verificación estática de tipos en contratos de API (api/client.ts), estado del carrito y props de componentes. |
-| vite y @vitejs/plugin-react | ^5.4.x | Servidor de desarrollo con HMR rápido, proxy local de /api/ y /media/ hacia Django bajo el mismo origen y empaquetado estático optimizado para Nginx. |
-| @vitejs/plugin-basic-ssl | ^1.1.0 | Habilita HTTPS local temporal para probar la cámara web de escaneo QR desde teléfonos reales en la red local. |
+| vite y @vitejs/plugin-react | ^5.4.x / ^4.3.x | Servidor de desarrollo con HMR rápido, proxy local de `/api/v1/` y `/media/` hacia Django bajo el mismo origen y empaquetado estático optimizado para Nginx. |
+| @vitejs/plugin-basic-ssl | ^1.1.0 | Habilita HTTPS local temporal para probar la cámara web de escaneo QR desde teléfonos reales en la red local (combinado con `CSRF_TRUSTED_ORIGINS` en backend local). |
 | eslint, prettier (+ eslint-config-prettier, eslint-plugin-react-hooks, typescript-eslint) | ^9.x / ^3.x | Linting estático y formateo automático de TypeScript/React (contraparte de ruff en backend), previniendo errores de dependencias en useEffect (escáner QR y *polling* del mapa) y conflictos de estilo en Git. |
 | vitest, @testing-library/react, @testing-library/jest-dom, jsdom | ^2.1.0 / ^16.0.0 | Ejecución rápida de pruebas unitarias y de componentes en src/features/\*\*/\_\_tests\_\_/, integrada nativamente con vite.config.ts. |
 | @playwright/test | ^1.48.0 | Pruebas automatizadas extremo a extremo (E2E) en tests/e2e/ sobre navegadores reales para validar compra, taquilla, cotizaciones y escaneo QR. |
