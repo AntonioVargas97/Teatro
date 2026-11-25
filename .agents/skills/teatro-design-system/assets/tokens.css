@@ -1,0 +1,65 @@
+/*
+ * Teatro de la Ciudad de Coatzacoalcos — Tokens CSS ("El Foro Monumental")
+ * Compatible con Tailwind v4 (@theme), CSS Modules, React, Next.js, Vue o HTML plano.
+ * Fuente tipográfica esperada: Cinzel (600..900) y Manrope (400..800).
+ */
+
+:root {
+  /* Paleta Institucional y Ecosistema */
+  --tc-azul-golfo: #1E3A8A;
+  --tc-golfo-deep: #162C6B;
+  --tc-arena-arq: #D9CBB8;
+  --tc-arena-calida: #F6F4EF;
+  --tc-arena-subbar: #EFECE4;
+  --tc-arena-borde: #E4DED3;
+  --tc-dorado: #E58E26;
+  --tc-ambar-accesible: #B45309;
+  --tc-celeste: #38BDF8;
+  --tc-blanco-nube: #F8F9FA;
+  --tc-blanco-puro: #FFFFFF;
+  --tc-carbon: #0F172A;
+  --tc-pizarra-oscuro: #020617;
+  --tc-nocturno-bg: #0B1736;
+  --tc-nocturno-surface: #13244E;
+
+  /* 6 Secciones Oficiales de Gran Sala (1,728 butacas + 12 accesibles) */
+  --tc-sec-luneta: #DC2626;
+  --tc-sec-platea: #EA580C;
+  --tc-sec-mezzanine: #1E3A8A;
+  --tc-sec-primer-piso: #15803D;
+  --tc-sec-segundo-piso: #7E22CE;
+  --tc-sec-palcos: #0284C7;
+
+  /* Tipografía */
+  --tc-font-display: 'Cinzel', Georgia, serif;
+  --tc-font-sans: 'Manrope', system-ui, -apple-system, sans-serif;
+
+  /* Radios y Sombras */
+  --tc-radius-sm: 6px;
+  --tc-radius-md: 12px;
+  --tc-radius-lg: 16px;
+  --tc-radius-xl: 24px;
+  --tc-radius-pill: 9999px;
+
+  --tc-shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --tc-shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -2px rgba(15, 23, 42, 0.1);
+  --tc-shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+
+  /* Movimiento */
+  --tc-transition-ui: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --tc-transition-card: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::selection {
+  background: var(--tc-azul-golfo);
+  color: var(--tc-blanco-puro);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+}
