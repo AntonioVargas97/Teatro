@@ -15,3 +15,6 @@ Este repositorio usa skills complementarias bajo `.agents/skills/`. Cuando dos g
    - Usa Conventional Commits y commits atómicos. Mientras el repositorio siga en etapa de configuración sobre `main`, **pregunta antes de commitear en `main`** salvo que el usuario ya indique explícitamente la rama destino.
 5. **Reportes de auditoría (`.agents/rules/auditorias-docs.md`):**
    - Toda auditoría nueva debe guardarse en `docs/reportes/<tipo-auditoria>/auditoria-[nombreDescriptivo]-[fecha].md` separada por tipo (`egm/`, `seguridad/`, `codigo/`, etc.).
+
+6. **Diagramas UML (`plantuml-diagrama-clases`):**
+   - Todo diagrama de clases en PlantUML vive en `docs/diagramas-uml/` y sigue UML 2.5.1 con relaciones sin cruces, verificado con `scripts/check_crossings.py`. Se construye solo con lo definido en las fuentes de verdad (`docs/arquitectura.md`, `docs/alcance.md`, `docs/maquinas-de-estado.md`).

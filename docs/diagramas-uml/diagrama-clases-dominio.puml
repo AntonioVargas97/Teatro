@@ -1,0 +1,256 @@
+@startuml diagrama-clases-dominio
+' ═══════════════════════════════════════════════════════════════════════════
+' Diagrama de clases del dominio (UML 2.5.1 / PlantUML)
+' Fuentes de verdad: docs/arquitectura.md (Entidades Nucleares, Módulos, Reglas
+' entre módulos), docs/alcance.md (reglas de negocio) y docs/maquinas-de-estado.md
+' (estados). Las enumeraciones se detallan en diagrama-clases-enumeraciones.puml.
+' Regla de legibilidad: ninguna relación se cruza con otra (planaridad).
+' ═══════════════════════════════════════════════════════════════════════════
+title Diagrama de Clases del Dominio — Teatro de la Ciudad de Coatzacoalcos
+
+skinparam linetype ortho
+skinparam nodesep 70
+skinparam ranksep 70
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #333333
+skinparam ClassBorderColor #333333
+skinparam NoteBackgroundColor #FFFBE6
+skinparam NoteBorderColor #B59B00
+skinparam LegendBackgroundColor #FFFFFF
+hide empty members
+hide circle
+
+' ── Módulo usuarios ───────────────────────────────────────────────────────
+class Usuario <<usuarios>> #BDD7EE {
+  + nombre : String
+  + apellido : String
+  + correo : String {unique}
+  + contrasenaHash : String
+  + rol : RolUsuario
+  + activo : Boolean
+  + aceptoAvisoPrivacidadEn : DateTime
+}
+
+' ── Módulo ventas ─────────────────────────────────────────────────────────
+class OrdenCompra <<ventas>> #F8CBAD {
+  + folio : String {unique}
+  + canal : CanalVenta
+  + estado : EstadoOrdenCompra
+  + medioPagoTaquilla : MedioPagoTaquilla [0..1]
+  + expiraEn : DateTime
+  + graciaHasta : DateTime [0..1]
+  + total : Decimal
+}
+
+class Transaccion <<ventas>> #F8CBAD {
+  + paymentIntentId : String
+  + medio : MedioPagoStripe
+  + monto : Decimal
+  + estado : EstadoTransaccion
+  + lineaCaptura : String [0..1]
+  + stripeEventId : String {unique}
+  + estadoWebhook : EstadoWebhook
+  + moduloDestino : ModuloDestino
+}
+
+' ── Módulo cotizaciones ───────────────────────────────────────────────────
+class PagoArrendamiento <<cotizaciones>> #C5E0B4 {
+  + concepto : ConceptoPago
+  + monto : Decimal
+  + estado : EstadoPagoArrendamiento
+  + venceEn : DateTime
+  + acreditadoEn : DateTime [0..1]
+}
+
+class Cotizacion <<cotizaciones>> #C5E0B4 {
+  + estado : EstadoCotizacion
+  + subEstadoFinanciero : SubEstadoFinanciero [0..1]
+  + subtotalEstimado : Decimal
+  + montoOficial : Decimal [0..1]
+  + esquemaCobro : EsquemaCobro
+  + anticipo : Decimal [0..1]
+  + saldo : Decimal [0..1]
+}
+
+class DetalleCotizacion <<cotizaciones>> #C5E0B4 {
+  + cantidad : Integer
+  + unidadCobro : UnidadCobro
+  + precioUnitario : Decimal
+  + subtotal : Decimal
+}
+
+' ── Módulo transversal configuracion ──────────────────────────────────────
+class Turno <<configuracion>> #E7E6E6 {
+  + nombre : String
+  + horaInicio : Time
+  + horaFin : Time
+  + tarifaNeta : Decimal
+}
+
+class ServicioExtra <<configuracion>> #E7E6E6 {
+  + nombre : String
+  + esInfraestructura : Boolean
+  + unidadCobro : UnidadCobro
+  + precio : Decimal
+}
+
+class ConfiguracionSistema <<configuracion>> #E7E6E6 {
+  + apartadoOrdenMin : Integer = 10
+  + graciaPagoMin : Integer = 5
+  + cierreWebMin : Integer = 30
+  + cierreTaquillaMin : Integer = 0
+  + preReservaHoras : Integer = 48
+  + propuestaAlternativaHoras : Integer = 48
+  + revisionExtemporaneaHoras : Integer = 72
+  + fechaLimitePublicacionDias : Integer = 15
+  + recordatorioCadaDias : Integer = 7
+  + corteSaldoDias : Integer = 21
+  + margen5050Dias : Integer = 9
+  + retencionPct : Decimal = 50
+  + umbralReprogramacionDias : Integer = 21
+}
+
+' ── Módulo transversal agenda ─────────────────────────────────────────────
+class BloqueoAgenda <<agenda>> #FFE699 {
+  + rangoTiempo : TSTZRANGE
+  + origen : OrigenBloqueo
+  + etiqueta : String
+  + estado : EstadoBloqueo
+  + expiraEn : DateTime [0..1]
+}
+
+' ── Módulo cartelera ──────────────────────────────────────────────────────
+class Evento <<cartelera>> #D9C9EC {
+  + nombre : String
+  + descripcion : String
+  + modalidad : ModalidadEvento
+  + origen : OrigenEvento
+  + poster : String [0..1]
+  + estado : EstadoEvento
+  + fechaLimitePublicacion : DateTime
+  + aprobadoPorId : Integer [0..1]
+  + aprobadoEn : DateTime [0..1]
+}
+
+class Categoria <<cartelera>> #D9C9EC {
+  + nombre : String
+}
+
+class Funcion <<cartelera>> #D9C9EC {
+  + fecha : Date
+  + horaInicio : Time
+  + horaFin : Time
+  + inicioEn : DateTime
+  + finEn : DateTime
+  + estado : EstadoFuncion
+}
+
+class SubseccionTarifaria <<cartelera>> #D9C9EC {
+  + nombre : String
+  + tarifaNeta : Decimal {>= 100.00}
+  + filaInicio : Integer [0..1]
+  + filaFin : Integer [0..1]
+  + colInicio : Integer [0..1]
+  + colFin : Integer [0..1]
+  + palcoIds : Integer [0..*]
+  + congelada : Boolean
+}
+
+' ── Módulo inventario ─────────────────────────────────────────────────────
+class Seccion <<inventario>> #B2DFDB {
+  + nombre : String
+}
+
+class Butaca <<inventario>> #B2DFDB {
+  + fila : Integer
+  + numero : Integer
+  + esAccesible : Boolean
+}
+
+class DisponibilidadButaca <<inventario>> #B2DFDB {
+  + estado : EstadoDisponibilidad
+  + tarifaSnapshot : Decimal
+}
+
+' ── Módulo boletos ────────────────────────────────────────────────────────
+class Boleto <<boletos>> #F4B6D4 {
+  + folioCorto : String {unique}
+  + tokenQr : String {unique}
+  + tipoEmision : TipoEmision
+  + estado : EstadoBoleto
+  + beneficiario : String [0..1]
+  + motivo : String [0..1]
+  + usadoEn : DateTime [0..1]
+  + validadoPorId : Integer [0..1]
+}
+
+' ── Módulo transversal auditoria ──────────────────────────────────────────
+class RegistroAuditoria <<auditoria>> #E7E6E6 {
+  + actorId : Integer
+  + accion : String
+  + entidad : String
+  + entidadId : String
+  + detalle : JSON
+  + ocurrioEn : DateTime
+}
+
+' ── Relaciones: pagos (fila superior) ─────────────────────────────────────
+Transaccion "0..1" -right- "0..1" PagoArrendamiento
+OrdenCompra "0..1" -up- "0..*" Transaccion
+Cotizacion "1" *-up- "0..2" PagoArrendamiento
+
+' ── Relaciones: actores ───────────────────────────────────────────────────
+OrdenCompra "0..*" -right- "0..1" Usuario : comprador
+OrdenCompra "0..*" -right- "0..1" Usuario : cajero
+Usuario "1" -right- "0..*" Cotizacion : solicitante
+
+' ── Relaciones: cotizaciones y catálogos de configuración ────────────────
+Cotizacion "1" *-right- "1..*" DetalleCotizacion
+DetalleCotizacion "0..*" -right-> "0..1" Turno
+DetalleCotizacion "0..*" -right-> "0..1" ServicioExtra
+Turno -[hidden]down- ServicioExtra
+ServicioExtra -[hidden]down- ConfiguracionSistema
+ConfiguracionSistema -[hidden]down- RegistroAuditoria
+
+' ── Relaciones: agenda y cartelera ────────────────────────────────────────
+Cotizacion "0..1" -down-> "0..*" BloqueoAgenda
+Cotizacion "0..1" -down- "0..1" Evento : origina >
+Evento "1" *-down- "1..*" Funcion
+Funcion "0..*" -left-> "1" BloqueoAgenda : ocupa >
+BloqueoAgenda -[hidden]right- Funcion
+Evento "0..*" -right- "1" Categoria : clasificado en >
+Evento "1" *-down- "0..*" SubseccionTarifaria
+
+' ── Relaciones: inventario y boletos ──────────────────────────────────────
+Funcion "1" -down- "0..*" DisponibilidadButaca
+SubseccionTarifaria "0..*" -down- "1" Seccion
+Seccion "1" *-left- "1..*" Butaca
+Butaca "1" -left- "0..*" DisponibilidadButaca
+OrdenCompra "0..1" -right- "0..*" DisponibilidadButaca
+DisponibilidadButaca "1" -down- "0..1" Boleto : respalda >
+
+' ── Leyenda y restricciones ───────────────────────────────────────────────
+legend right
+  |= Color |= Módulo (docs/arquitectura.md) |
+  |<#BDD7EE>   | usuarios |
+  |<#F8CBAD>   | ventas |
+  |<#F4B6D4>   | boletos |
+  |<#B2DFDB>   | inventario |
+  |<#D9C9EC>   | cartelera |
+  |<#C5E0B4>   | cotizaciones |
+  |<#FFE699>   | agenda (transversal) |
+  |<#E7E6E6>   | configuracion y auditoria (transversales) |
+
+  **Restricciones y notas de lectura**
+  - {xor} Transaccion: pertenece a una OrdenCompra o a un PagoArrendamiento.
+  - {xor} DetalleCotizacion: referencia un Turno o un ServicioExtra (precio en snapshot).
+  - OrdenCompra: canal LINEA exige comprador; TAQUILLA exige cajero. Una sola Función por orden.
+  - Boleto llega a su OrdenCompra por DisponibilidadButaca (las cortesías no tienen OrdenCompra).
+  - Flechas abiertas: navegabilidad hacia módulos transversales o catálogos (sin imports inversos, ADP).
+  - ConfiguracionSistema y RegistroAuditoria no tienen asociaciones: se consumen por servicio e id.
+  - Tipos como EstadoEvento o RolUsuario son enumeraciones: ver diagrama-clases-enumeraciones.puml.
+endlegend
+
+@enduml

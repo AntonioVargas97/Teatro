@@ -1,0 +1,207 @@
+@startuml diagrama-clases-enumeraciones
+' ═══════════════════════════════════════════════════════════════════════════
+' Enumeraciones del dominio (UML 2.5.1 / PlantUML), agrupadas por módulo.
+' Complementa a diagrama-clases-dominio.puml: cada atributo tipado con una de
+' estas enumeraciones referencia aquí sus literales oficiales.
+' Fuentes de verdad: docs/arquitectura.md, docs/alcance.md y
+' docs/maquinas-de-estado.md (estados y transiciones).
+' ═══════════════════════════════════════════════════════════════════════════
+title Enumeraciones del Dominio — Teatro de la Ciudad de Coatzacoalcos
+
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 40
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ClassBorderColor #333333
+skinparam PackageBorderColor #888888
+skinparam PackageBackgroundColor #FAFAFA
+hide empty members
+hide circle
+
+package "usuarios" {
+  class RolUsuario <<enumeration>> #BDD7EE {
+    ADMIN
+    CAJERO
+    VERIFICADOR
+    USUARIO
+  }
+}
+
+package "ventas" {
+  class CanalVenta <<enumeration>> #F8CBAD {
+    LINEA
+    TAQUILLA
+  }
+  class EstadoOrdenCompra <<enumeration>> #F8CBAD {
+    APARTADO
+    PAGO_EN_PROCESO
+    PAGADA
+    EXPIRADA
+    REEMBOLSADA_AUTOMATICA
+  }
+  class MedioPagoTaquilla <<enumeration>> #F8CBAD {
+    EFECTIVO
+    TARJETA_EXTERNA
+  }
+  class EstadoTransaccion <<enumeration>> #F8CBAD {
+    PENDIENTE
+    ACREDITADA
+    FALLIDA
+    CANCELADA
+    REEMBOLSADA
+  }
+  class MedioPagoStripe <<enumeration>> #F8CBAD {
+    TARJETA
+    SPEI
+    EFECTIVO
+  }
+  class EstadoWebhook <<enumeration>> #F8CBAD {
+    PENDIENTE
+    PROCESADO
+    FALLIDO
+  }
+  class ModuloDestino <<enumeration>> #F8CBAD {
+    VENTAS
+    COTIZACIONES
+  }
+}
+
+package "cotizaciones" {
+  class EstadoCotizacion <<enumeration>> #C5E0B4 {
+    EN_REVISION
+    PROPUESTA_RETENIDA
+    PROPUESTA_EXPIRADA
+    PRE_RESERVADO
+    CONFIRMADO
+    EXPIRADA_SIN_PAGO
+    EXPIRADA_POR_FECHA
+    PAGO_EXTEMPORANEO_EN_REVISION
+    RECHAZADA
+    CANCELADO_POR_ARRENDATARIO
+    CANCELADO_POR_TEATRO
+    FINALIZADO
+  }
+  class SubEstadoFinanciero <<enumeration>> #C5E0B4 {
+    ANTICIPO_50_PAGADO
+    LIQUIDADO_100
+    REEMBOLSO_BANCARIO_PENDIENTE
+  }
+  class EsquemaCobro <<enumeration>> #C5E0B4 {
+    CINCUENTA_CINCUENTA
+    TOTAL_100
+  }
+  class ConceptoPago <<enumeration>> #C5E0B4 {
+    ANTICIPO_50
+    SALDO_50
+    LIQUIDACION_100
+  }
+  class EstadoPagoArrendamiento <<enumeration>> #C5E0B4 {
+    PENDIENTE
+    ACREDITADO
+    EN_REVISION_EXTEMPORANEA
+    VENCIDO
+    REEMBOLSADO
+    REEMBOLSO_BANCARIO_PENDIENTE
+  }
+}
+
+package "configuracion" {
+  class UnidadCobro <<enumeration>> #E7E6E6 {
+    POR_EVENTO
+    POR_DIA
+    POR_TURNO
+    POR_UNIDAD
+  }
+}
+
+package "agenda" {
+  class OrigenBloqueo <<enumeration>> #FFE699 {
+    FUNCION
+    RENTA
+    MANTENIMIENTO
+  }
+  class EstadoBloqueo <<enumeration>> #FFE699 {
+    PROPUESTA_RETENIDA
+    PRE_RESERVADO
+    CONFIRMADO
+    LIBERADO
+  }
+}
+
+package "cartelera" {
+  class ModalidadEvento <<enumeration>> #D9C9EC {
+    COMERCIAL
+    PUBLICO
+    PRIVADO
+  }
+  class OrigenEvento <<enumeration>> #D9C9EC {
+    ARRENDAMIENTO
+    DIRECTO
+  }
+  class EstadoEvento <<enumeration>> #D9C9EC {
+    PENDIENTE_PUBLICACION
+    PUBLICADO
+    VENCIDO_SIN_PUBLICAR
+    OPERACION_SIN_CARTELERA
+    CANCELADO_POR_ARRENDATARIO
+    CANCELADO_POR_TEATRO
+    FINALIZADO
+  }
+  class EstadoFuncion <<enumeration>> #D9C9EC {
+    PROGRAMADA
+    REPROGRAMADO
+    CANCELADA
+    CONCLUIDA
+  }
+}
+
+package "inventario" {
+  class EstadoDisponibilidad <<enumeration>> #B2DFDB {
+    DISPONIBLE
+    APARTADA
+    VENDIDA
+    BLOQUEO_TECNICO
+    CORTESIA
+  }
+}
+
+package "boletos" {
+  class TipoEmision <<enumeration>> #F4B6D4 {
+    VENTA
+    CORTESIA
+  }
+  class EstadoBoleto <<enumeration>> #F4B6D4 {
+    EMITIDO
+    USADO
+    USADO_CONTINGENCIA
+    INVALIDADO
+  }
+}
+
+' Rejilla de lectura (sin relaciones UML entre enumeraciones)
+RolUsuario -[hidden]right- CanalVenta
+CanalVenta -[hidden]down- EstadoOrdenCompra
+EstadoOrdenCompra -[hidden]down- MedioPagoTaquilla
+CanalVenta -[hidden]right- EstadoTransaccion
+EstadoTransaccion -[hidden]down- MedioPagoStripe
+MedioPagoStripe -[hidden]down- EstadoWebhook
+EstadoWebhook -[hidden]down- ModuloDestino
+EstadoTransaccion -[hidden]right- EstadoCotizacion
+EstadoCotizacion -[hidden]down- SubEstadoFinanciero
+SubEstadoFinanciero -[hidden]down- EsquemaCobro
+EsquemaCobro -[hidden]down- ConceptoPago
+ConceptoPago -[hidden]down- EstadoPagoArrendamiento
+EstadoCotizacion -[hidden]right- UnidadCobro
+UnidadCobro -[hidden]down- OrigenBloqueo
+OrigenBloqueo -[hidden]down- EstadoBloqueo
+UnidadCobro -[hidden]right- ModalidadEvento
+ModalidadEvento -[hidden]down- OrigenEvento
+OrigenEvento -[hidden]down- EstadoEvento
+EstadoEvento -[hidden]down- EstadoFuncion
+ModalidadEvento -[hidden]right- EstadoDisponibilidad
+EstadoDisponibilidad -[hidden]down- TipoEmision
+TipoEmision -[hidden]down- EstadoBoleto
+
+@enduml

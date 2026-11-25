@@ -21,6 +21,7 @@ Consulta y aplica la guía correspondiente según el área de trabajo (ver detal
 * **Pruebas y CI (`.github/workflows/pruebas.yml`):** `playwright-vitest-teatro` (`TestCase`, `TransactionTestCase` para concurrencia, `ruff`, `import-linter`, `tsc --noEmit`, `ESLint + Prettier`, `Vitest`, `Playwright`).
 * **Seguridad:** `security-audit` como guía continua (RBAC, anti-IDOR/BOLA, firmas Stripe y QR); ejecutar auditoría completa solo cuando se solicite explícitamente.
 * **Control de versiones:** `git-workflow` (Conventional Commits, commits atómicos). Mientras siga la etapa inicial sobre `main`, preguntar antes de commitear directo en `main` salvo indicación explícita.
+* **Diagramas de clases UML:** `plantuml-diagrama-clases` (PlantUML en `docs/diagramas-uml/`, UML 2.5.1, relaciones sin cruces verificadas con `check_crossings.py`, solo con entidades y estados definidos en las fuentes de verdad).
 * **Auditorías:** Regla condicional `.agents/rules/auditorias-docs.md` (reportes inmutables *append-only* en `docs/reportes/<tipo-auditoria>/auditoria-[nombreDescriptivo]-[fecha].md`).
 
 ## 3. Reglas Operativas Siempre Activas
