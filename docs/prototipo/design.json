@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-23T19:53:00-06:00",
+  "title": "Design System: Teatro de la Ciudad de Coatzacoalcos",
+  "extensions": {
+    "colorMeta": {
+      "azul-golfo": {
+        "role": "primary",
+        "displayName": "Azul Golfo",
+        "canonical": "#1E3A8A",
+        "tonalRamp": ["#0A1538", "#112257", "#162C6B", "#1E3A8A", "#2F50AD", "#5473C9", "#8DA6E2", "#DCE5F9"]
+      },
+      "golfo-profundo": {
+        "role": "primary",
+        "displayName": "Golfo Profundo",
+        "canonical": "#162C6B",
+        "tonalRamp": ["#0B1736", "#112257", "#162C6B", "#1E3A8A", "#2F50AD", "#5473C9"]
+      },
+      "dorado-atardecer": {
+        "role": "primary",
+        "displayName": "Dorado Atardecer",
+        "canonical": "#E58E26",
+        "tonalRamp": ["#4A2805", "#72400B", "#9D5A12", "#C4741B", "#E58E26", "#EEA954", "#F5C689", "#FDECD3"]
+      },
+      "arena-arquitectonica": {
+        "role": "secondary",
+        "displayName": "Arena Arquitectónica",
+        "canonical": "#D9CBB8",
+        "tonalRamp": ["#3D352B", "#5B5041", "#7B6D5A", "#9E8D76", "#BEA992", "#D9CBB8", "#E9E0D3", "#F6F4EF"]
+      },
+      "arena-calida": {
+        "role": "neutral",
+        "displayName": "Arena Cálida (Admin Backstage)",
+        "canonical": "#F6F4EF",
+        "tonalRamp": ["#D9CBB8", "#E4DED3", "#EFECE4", "#F6F4EF", "#FAF8F5", "#FFFFFF"]
+      },
+      "nocturno-golfo": {
+        "role": "neutral",
+        "displayName": "Azul Nocturno del Golfo (Verificador Puerta)",
+        "canonical": "#0B1736",
+        "tonalRamp": ["#060D21", "#0B1736", "#13244E", "#1E3A8A", "#2F50AD"]
+      },
+      "ambar-accesible": {
+        "role": "primary",
+        "displayName": "Ámbar Accesible",
+        "canonical": "#B45309",
+        "tonalRamp": ["#3E1A02", "#622A04", "#8A3E06", "#B45309", "#D97706", "#F59E0B", "#FBBF24", "#FEF3C7"]
+      },
+      "celeste-brisa": {
+        "role": "tertiary",
+        "displayName": "Celeste Brisa",
+        "canonical": "#38BDF8",
+        "tonalRamp": ["#083344", "#0C4A6E", "#0369A1", "#0284C7", "#38BDF8", "#7DD3FC", "#BAE6FD", "#E0F2FE"]
+      },
+      "blanco-nube": {
+        "role": "neutral",
+        "displayName": "Blanco Nube",
+        "canonical": "#F8F9FA",
+        "tonalRamp": ["#1E293B", "#334155", "#64748B", "#94A3B8", "#CBD5E1", "#E2E8F0", "#F1F5F9", "#F8F9FA"]
+      },
+      "blanco-puro": {
+        "role": "neutral",
+        "displayName": "Blanco Puro",
+        "canonical": "#FFFFFF",
+        "tonalRamp": ["#1E293B", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#E2E8F0", "#F8FAFC", "#FFFFFF"]
+      },
+      "carbon-pizarra": {
+        "role": "neutral",
+        "displayName": "Carbón Pizarra",
+        "canonical": "#0F172A",
+        "tonalRamp": ["#020617", "#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#E2E8F0"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display (Cinzel)", "purpose": "Titular principal del mural de temporada en portada." },
+      "headline": { "displayName": "Headline (Cinzel)", "purpose": "Encabezados de página públicos y títulos de espectáculos." },
+      "title": { "displayName": "Title (Manrope)", "purpose": "Encabezados operativos en Admin, tarjetas de cartelera e inspector lateral." },
+      "body": { "displayName": "Body (Manrope)", "purpose": "Sinopsis, descripciones, lectura tabular y formularios." },
+      "label": { "displayName": "Label (Manrope)", "purpose": "Etiquetas superiores, fechas, precios MXN y badges de estado (>= 12px)." }
+    },
+    "shadows": [
+      { "name": "surface-sm", "value": "0 1px 2px 0 rgba(15, 23, 42, 0.05)", "purpose": "Contenedores de mapa y FAQ públicas." },
+      { "name": "surface-md", "value": "0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -2px rgba(15, 23, 42, 0.1)", "purpose": "Tarjetas de cartelera en reposo, barra sticky y botones." },
+      { "name": "elevated-xl", "value": "0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.1)", "purpose": "Hover de tarjetas, desplegables y modales." }
+    ],
+    "motion": [
+      { "name": "transition-ui", "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Transición contenida para botones, inputs y enlaces." },
+      { "name": "transition-card", "value": "300ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Elevación sutil en tarjetas de cartelera." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action Button (Public)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Botón principal de acción en cápsula para registro, compra de boletos y envío de cotización.",
+      "html": "<button type=\"button\" class=\"ds-btn-primary\"><span>Confirmar Boletos</span></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #E58E26; color: #FFFFFF; font-family: 'Manrope', system-ui, sans-serif; font-size: 0.875rem; font-weight: 700; padding: 10px 20px; border: none; border-radius: 9999px; cursor: pointer; }"
+    },
+    {
+      "name": "Operate Accent Button (Admin / Puerta QR)",
+      "kind": "button",
+      "refersTo": "button-operate-accent",
+      "description": "Botón de acento dorado en consola operativa con tinta Carbón Pizarra para contraste AAA (7.0:1).",
+      "html": "<button type=\"button\" class=\"ds-btn-op\">Aprobar 48 h</button>",
+      "css": ".ds-btn-op { display: inline-flex; align-items: center; justify-content: center; background: #E58E26; color: #0F172A; font-family: 'Manrope', system-ui, sans-serif; font-size: 0.75rem; font-weight: 800; padding: 10px 18px; border: none; border-radius: 9999px; cursor: pointer; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "El Foro Monumental",
+    "overview": "Sistema ecosistémico unificado para el Teatro de la Ciudad de Coatzacoalcos con tres registros: Portal Público (Azul Golfo + Blanco Nube + Cinzel), Consola Operativa de Administración (Cabecera Azul Golfo en 4 Pilares + Lienzo Arena Cálida #F6F4EF + Mesas Split 7+5) y Verificador de Puerta QR (Azul Nocturno del Golfo #0B1736 con Tarjeta-Pase dominante superior) sobre el plano oficial de 1,728 butacas en 6 secciones (+12 accesibles).",
+    "keyCharacteristics": [
+      "Ecosistema compartido en torno a Azul Golfo (#1E3A8A) y Arena Arquitectónica (#D9CBB8).",
+      "Consola Admin con cabecera superior de 4 pilares, sub-barra Arena y Split 7+5 sin modales repetitivos.",
+      "Verificador QR en Azul Nocturno (#0B1736) con veredicto dominante superior y telemetría de ingreso."
+    ],
+    "rules": [
+      { "name": "The Contrast-Aware Amber Rule", "body": "Dorado Atardecer con texto blanco en CTA públicos; con Carbón Pizarra (#0F172A, 7.0:1) en consola Admin/Puerta QR; Ámbar Accesible (#B45309) sobre fondos claros y Arena Cálida.", "section": "colors" },
+      { "name": "The Solid Surface Priority Rule", "body": "Superficies sólidas limpias sin gradientes ni blur-3xl; elevación declarada una sola vez.", "section": "colors" },
+      { "name": "The Bilingual Hierarchy Rule", "body": "Cinzel para títulos de obra y hitos del recinto; Manrope tabular para toda operación administrativa y puerta QR.", "section": "typography" },
+      { "name": "The Quiet Rest Rule", "body": "Reposo limpio mediante contraste Arena/Blanco y borde 1px.", "section": "elevation" }
+    ],
+    "dos": [
+      "Mantener 1,728 localidades en 6 secciones oficiales (+12 accesibles).",
+      "Usar #F6F4EF Arena Cálida en backstage Admin y #0B1736 Azul Nocturno en Verificador QR.",
+      "Preservar el tamaño mínimo legible (>= 12px) e íconos SVG consistentes."
+    ],
+    "donts": [
+      "No usar #020617 ni #F1F5F9 genéricos en Admin ni barras laterales unilaterales.",
+      "No apilar 4 tarjetas KPI idénticas con cajas de íconos ni modales donde un Split 7+5 resuelve inline.",
+      "No colocar simuladores de prueba por encima del bloque de resultado en verificador.html."
+    ]
+  }
+}
