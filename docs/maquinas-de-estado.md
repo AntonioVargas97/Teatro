@@ -153,6 +153,24 @@ Al leer un código QR (`{token}`), el sistema valida la firma `HMAC-SHA256` (`QR
 * Dentro de `transaction.atomic()`, inserta `event.id` en `stripe_webhook_events` (`stripe_event_id VARCHAR(120) PRIMARY KEY`, `estado = 'PENDIENTE'`, `modulo = metadata.modulo`) y encola la tarea asíncrona de Celery (`acks_late=True`) únicamente dentro de `transaction.on_commit()`.
 * Si el `INSERT` falla por llave duplicada (`IntegrityError`), responde `HTTP 200 OK` sin reprocesar; si Redis falla antes de encolar, retorna `HTTP 500` para que Stripe reintente.
 
+#### **Estados de `Transaccion` y `PagoArrendamiento`**
+
+Además del estado de idempotencia del *webhook* (`PENDIENTE`, `PROCESADO`, `FALLIDO` en `stripe_webhook_events`), las entidades financieras derivadas de los flujos de **ME-01** y **ME-03** siguen estos estados oficiales:
+
+* **`Transaccion` (`EstadoTransaccion`, módulo `ventas`):**
+  * `PENDIENTE`: `PaymentIntent` creado (tarjeta) o ficha SPEI/efectivo emitida; aguardando confirmación de Stripe.
+  * `ACREDITADA`: Confirmada por *webhook* `payment_intent.succeeded`.
+  * `FALLIDA`: Rechazada por *webhook* `payment_intent.payment_failed` (reintentable dentro de la ventana vigente).
+  * `CANCELADA`: Cancelada explícitamente en Stripe al expirar `OrdenCompra` (`expirar_carritos_boletos`) o `PRE_RESERVADO` (`expirar_retenciones_agenda`).
+  * `REEMBOLSADA`: Reembolso técnico automático del 100% ejecutado vía Stripe API (`Refund` / `charge.refunded`) por pago tardío con tarjeta fuera de ventana o sin disponibilidad.
+* **`PagoArrendamiento` (`EstadoPagoArrendamiento`, módulo `cotizaciones`):**
+  * `PENDIENTE`: Cuota generada (`ANTICIPO_50`, `SALDO_50` o `LIQUIDACION_100`) dentro de plazo (`48 h` en `PRE_RESERVADO` o hasta `D-21 23:59:59`).
+  * `ACREDITADO`: Pago validado y aplicado a la cotización (`ANTICIPO_50_PAGADO` o `LIQUIDADO_100`).
+  * `EN_REVISION_EXTEMPORANEA`: Pago acreditado tras vencer `48 h` con fecha aún libre (`PAGO_EXTEMPORANEO_EN_REVISION`, plazo `72 h` del Admin).
+  * `VENCIDO`: Plazo expirado sin acreditación (`EXPIRADA_SIN_PAGO` o incumplimiento `D-21`).
+  * `REEMBOLSADO`: Devuelto al 100% vía Stripe API (tarjeta fuera de ventana o rechazada por Admin).
+  * `REEMBOLSO_BANCARIO_PENDIENTE`: Ficha SPEI/efectivo acreditada fuera de ventana o tras `D-21`, pendiente de devolución bancaria externa por Admin.
+
 ### **6.3 Catálogo de Tareas Periódicas (Celery Beat)**
 
 Todas las tareas consultan columnas `TIMESTAMPTZ` persistidas en BD bajo `America/Mexico_City` y bloquean lotes con `select_for_update(skip_locked=True)` para no competir con peticiones HTTP:
