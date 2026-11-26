@@ -147,18 +147,30 @@ class Funcion <<cartelera>> #D9C9EC {
   + estado : EstadoFuncion
 }
 
-class SubseccionTarifaria <<cartelera>> #D9C9EC {
+class SeccionEvento <<cartelera>> #D9C9EC {
   + nombre : String
-  + tarifaNeta : Decimal {>= 100.00}
   + filaInicio : Integer [0..1]
   + filaFin : Integer [0..1]
   + colInicio : Integer [0..1]
   + colFin : Integer [0..1]
   + palcoIds : Integer [0..*]
-  + congelada : Boolean
+}
+
+class FaseVenta <<cartelera>> #D9C9EC {
+  + nombre : String
+  + iniciaEn : DateTime
+}
+
+class PrecioSeccion <<cartelera>> #D9C9EC {
+  + tarifaNeta : Decimal {>= 100.00}
 }
 
 ' ── Módulo inventario ─────────────────────────────────────────────────────
+class Sala <<inventario>> #B2DFDB {
+  + nombre : String
+  + aforoOficial : Integer = 1728
+}
+
 class Seccion <<inventario>> #B2DFDB {
   + nombre : String
 }
@@ -171,7 +183,7 @@ class Butaca <<inventario>> #B2DFDB {
 
 class DisponibilidadButaca <<inventario>> #B2DFDB {
   + estado : EstadoDisponibilidad
-  + tarifaSnapshot : Decimal
+  + tarifaSnapshot : Decimal [0..1]
 }
 
 ' ── Módulo boletos ────────────────────────────────────────────────────────
@@ -215,17 +227,22 @@ ServicioExtra -[hidden]down- ConfiguracionSistema
 ConfiguracionSistema -[hidden]down- RegistroAuditoria
 
 ' ── Relaciones: agenda y cartelera ────────────────────────────────────────
+Usuario -[hidden]down- BloqueoAgenda
+BloqueoAgenda -[hidden]right- Evento
 Cotizacion "0..1" -down-> "0..*" BloqueoAgenda
 Cotizacion "0..1" -down- "0..1" Evento : origina >
 Evento "1" *-down- "1..*" Funcion
-Funcion "0..*" -left-> "1" BloqueoAgenda : ocupa >
-BloqueoAgenda -[hidden]right- Funcion
+Funcion "0..*" -up-> "1" BloqueoAgenda : ocupa >
 Evento "0..*" -right- "1" Categoria : clasificado en >
-Evento "1" *-down- "0..*" SubseccionTarifaria
+Evento "1" *-down- "0..*" SeccionEvento
+Evento "1" *-right- "1..*" FaseVenta
+FaseVenta "1" -down- "1..*" PrecioSeccion
+SeccionEvento "1" -right- "1..*" PrecioSeccion
 
 ' ── Relaciones: inventario y boletos ──────────────────────────────────────
 Funcion "1" -down- "0..*" DisponibilidadButaca
-SubseccionTarifaria "0..*" -down- "1" Seccion
+SeccionEvento "0..*" -down- "0..*" Seccion
+Seccion "1..*" -right-* "1" Sala
 Seccion "1" *-left- "1..*" Butaca
 Butaca "1" -left- "0..*" DisponibilidadButaca
 OrdenCompra "0..1" -right- "0..*" DisponibilidadButaca
@@ -248,6 +265,7 @@ legend right
   - {xor} DetalleCotizacion: referencia un Turno o un ServicioExtra (precio en snapshot).
   - OrdenCompra: canal LINEA exige comprador; TAQUILLA exige cajero. Una sola Función por orden.
   - Boleto llega a su OrdenCompra por DisponibilidadButaca (las cortesías no tienen OrdenCompra).
+  - DisponibilidadButaca registra la tarifa congelada (tarifaSnapshot) de la fase y sección aplicadas.
   - Flechas abiertas: navegabilidad hacia módulos transversales o catálogos (sin imports inversos, ADP).
   - ConfiguracionSistema y RegistroAuditoria no tienen asociaciones: se consumen por servicio e id.
   - Tipos como EstadoEvento o RolUsuario son enumeraciones: ver diagrama-clases-enumeraciones.puml.

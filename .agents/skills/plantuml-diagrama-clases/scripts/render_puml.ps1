@@ -19,7 +19,8 @@ if (-not $jar) { throw 'No se encontró plantuml.jar. Define PLANTUML_JAR.' }
 if (-not $env:GRAPHVIZ_DOT) {
     $dot = Get-Command dot -ErrorAction SilentlyContinue
     if (-not $dot) {
-        $dot = Get-ChildItem 'C:\Program Files\Graphviz*\bin\dot.exe', 'C:\Program Files (x86)\Graphviz*\bin\dot.exe' `
+        $dot = Get-ChildItem 'C:\Program Files\Graphviz*\bin\dot.exe', 'C:\Program Files (x86)\Graphviz*\bin\dot.exe', `
+            "$env:USERPROFILE\.gemini\antigravity\brain\*\scratch\gv\*\bin\dot.exe" `
             -ErrorAction SilentlyContinue | Select-Object -First 1
     }
     if (-not $dot) { throw 'No se encontró Graphviz (dot). Instálalo o define GRAPHVIZ_DOT.' }
