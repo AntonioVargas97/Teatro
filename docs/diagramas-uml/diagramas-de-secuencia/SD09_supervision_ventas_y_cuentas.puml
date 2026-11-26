@@ -1,0 +1,64 @@
+@startuml SD09_supervision_ventas_y_cuentas
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam ParticipantPadding 10
+skinparam BoxPadding 8
+hide footbox
+autonumber
+title SD09 · Supervisión de ventas y cuentas internas (casos de uso 09)
+
+actor "Administrador" as A
+box "Operación interna /gestion/" #FFFFFF
+  boundary "AdminVentasAuditoriaPage" as UI_VTA
+  boundary "AdminPersonalPage" as UI_PER
+end box
+control "VentasService" as VTA_CTL
+control "PagosService" as PAG_CTL
+control "AuditoriaService" as AUD_CTL
+entity "OrdenCompra" as E_OC
+entity "PagoOrden" as E_PAG
+entity "Boleto" as E_BOL
+entity "WebhookStripe" as E_WH
+entity "RegistroAuditoria" as E_AUD
+
+== UC1 · Consultar ventas globales y cancelaciones auditadas ==
+A -> UI_VTA : Aplica filtros (desde, hasta, estado, canal)
+UI_VTA -> VTA_CTL ++ : GET /api/v1/ventas/ordenes/?desde=&hasta=&estado=&canal=
+VTA_CTL -> E_OC : consultar órdenes paginadas
+VTA_CTL --> UI_VTA -- : 200 {count, results}
+UI_VTA -> VTA_CTL ++ : GET /api/v1/ventas/pagos/?desde=&hasta=&estado=&canal=
+VTA_CTL -> E_PAG : consultar cobros y reembolsos
+VTA_CTL --> UI_VTA -- : 200 {count, results}
+opt [conciliación de webhooks Stripe]
+  UI_VTA -> PAG_CTL ++ : GET /api/v1/pagos/webhooks/
+  PAG_CTL -> E_WH : listar eventos Stripe y estado de procesamiento
+  PAG_CTL --> UI_VTA -- : 200 {count, results}
+end
+UI_VTA --> A : Muestra tablero de ventas, cobros y conciliación
+
+== UC2 · Administrar cuentas internas ==
+ref over A, UI_PER : SD10 · Administración de cuentas internas (alta, edición, suspensión y revocación de sesiones)
+
+== UC3 · Registrar anulación auditada de orden ==
+A -> UI_VTA : Solicita ajuste contable auditado con motivo obligatorio
+UI_VTA -> VTA_CTL ++ : POST /api/v1/ventas/ordenes/{id}/anulaciones/ {motivo}
+VTA_CTL -> E_OC : verificar canal == TAQUILLA y estado == PAGADA
+VTA_CTL -> E_BOL : verificar que ningún boleto haya ingresado (USADO / USADO_CONTINGENCIA)
+alt [orden de taquilla pagada y 0 boletos utilizados]
+  VTA_CTL -> AUD_CTL : registrar asiento de ajuste administrativo (sin borrado físico)
+  AUD_CTL -> E_AUD : insertar registro inmutable
+  note right of VTA_CTL : La orden conserva PAGADA, boletos, QR e inventario;\nno dispara devolución Stripe ni abre reventa.
+  VTA_CTL --> UI_VTA : 201 {ajuste_id, orden_id}
+else [canal en línea, orden no pagada o algún boleto ya usado]
+  VTA_CTL --> UI_VTA -- : 409 AJUSTE_NO_PERMITIDO
+end
+UI_VTA --> A : Confirma asiento de ajuste registrado
+
+== UC4 · Consultar bitácora global de auditoría ==
+A -> UI_VTA : Filtra bitácora (modulo, actor_id, desde, hasta)
+UI_VTA -> AUD_CTL ++ : GET /api/v1/auditoria/registros/?modulo=&actor_id=&desde=&hasta=
+AUD_CTL -> E_AUD : consultar registros inmutables paginados
+AUD_CTL --> UI_VTA -- : 200 {count, results}
+UI_VTA --> A : Muestra trazas de auditoría
+@enduml

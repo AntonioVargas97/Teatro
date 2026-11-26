@@ -1,0 +1,156 @@
+@startuml SD06_eventos_tarifas_y_publicacion
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam ParticipantPadding 10
+skinparam BoxPadding 8
+hide footbox
+autonumber
+title SD06 · Gestión de eventos, tarifas y publicación (casos de uso 06)
+
+actor "Administrador" as A
+actor "Usuario estándar" as U
+box "Operación interna /gestion/" #FFFFFF
+  boundary "AdminEventosPage" as UI_ADM
+end box
+box "Portal público /" #FFFFFF
+  boundary "ConfiguradorTarifas" as UI_USR
+end box
+control "CarteleraService" as CAR_CTL
+control "AgendaService" as AGD_CTL
+control "InventarioService" as INV_CTL
+control "BoletosService" as BOL_CTL
+control "AuditoriaService" as AUD_CTL
+entity "Evento" as E_EVT
+entity "Funcion" as E_FUN
+entity "BloqueoAgenda" as E_AGD
+entity "SeccionEvento" as E_SEC
+entity "FaseVenta" as E_FAS
+entity "PrecioSeccion" as E_PRE
+entity "DisponibilidadButaca" as E_DIS
+entity "Cortesia" as E_COR
+entity "Boleto" as E_BOL
+entity "BloqueoTecnico" as E_BLQ
+entity "RegistroAuditoria" as E_AUD
+participant "Servicio SMTP" as MAIL <<sistema>>
+
+== UC1, UC2, UC3 y UC4 · Registrar evento directo, consultar, editar y funciones ==
+A -> UI_ADM : Registra evento directo (nombre, categoría, modalidad, bloques, funciones)
+UI_ADM -> CAR_CTL ++ : POST /api/v1/cartelera/gestion/eventos/ {nombre, categoria_id, modalidad, bloques, funciones}
+critical [transacción atómica · reservar bloques en agenda]
+  CAR_CTL -> AGD_CTL : crear bloqueos FUNCION (409 CRUCE_AGENDA si traslapan)
+  AGD_CTL -> E_AGD : insertar bloques
+  CAR_CTL -> E_EVT : crear evento (PENDIENTE_PUBLICACION o OPERACION_SIN_CARTELERA si Privado)
+  CAR_CTL -> E_FUN : crear funciones dentro de cada bloque
+end
+CAR_CTL --> UI_ADM -- : 201 {evento_id, estado}
+
+A -> UI_ADM : Consulta / edita nombre o categoría del evento
+UI_ADM -> CAR_CTL ++ : PATCH /api/v1/cartelera/gestion/eventos/{id}/ {nombre, categoria_id}
+CAR_CTL -> E_EVT : actualizar metadatos
+CAR_CTL --> UI_ADM -- : 200 {evento}
+
+opt [añadir nueva función dentro de un bloque existente]
+  A -> UI_ADM : Agrega función en bloque_id
+  UI_ADM -> CAR_CTL ++ : POST /api/v1/cartelera/eventos/{id}/funciones/ {bloque_id, inicio_en, fin_en}
+  CAR_CTL -> E_FUN : crear función disjunta dentro del bloque
+  CAR_CTL --> UI_ADM -- : 201 {funcion_id}
+end
+
+== UC9 y UC10 · Cargar póster y configurar secciones del evento, fases y tarifas ==
+U -> UI_USR : Sube póster publicitario (arrendamiento propio pagado, pre-publicación)
+UI_USR -> CAR_CTL ++ : PUT /api/v1/cartelera/eventos/{id}/poster/ (multipart <= 5 MB)
+CAR_CTL -> E_EVT : validar propiedad anti-IDOR y estado no publicado
+CAR_CTL --> UI_USR -- : 200 {poster_url}
+
+U -> UI_USR : Configura secciones del evento, fases consecutivas y precios (>= $100.00 MXN)
+UI_USR -> CAR_CTL ++ : PUT /api/v1/cartelera/eventos/{id}/tarifario/ {secciones_evento, fases_venta, precios}
+alt [válido, sin traslapes, <= 6 subdivisiones / Palcos por cabina y no publicado]
+  CAR_CTL -> E_SEC : guardar SeccionEvento y asignación de butacas
+  CAR_CTL -> E_FAS : guardar FaseVenta consecutivas
+  CAR_CTL -> E_PRE : guardar PrecioSeccion (>= 100.00 MXN)
+  CAR_CTL --> UI_USR : 200 {secciones_evento, fases_venta, precios}
+else [evento ya publicado]
+  CAR_CTL --> UI_USR : 409 TARIFARIO_CONGELADO
+else [configuración inválida]
+  CAR_CTL --> UI_USR -- : 400 DATOS_INVALIDOS
+end
+note over UI_ADM, UI_USR : El Administrador puede ejecutar UC9 y UC10 desde AdminEventosPage sobre cualquier evento no publicado.
+
+== UC8 · Publicar evento (congelar tarifario y generar inventario) ==
+A -> UI_ADM : Aprueba y publica evento (Comercial o Público)
+UI_ADM -> CAR_CTL ++ : POST /api/v1/cartelera/eventos/{id}/publicar/
+CAR_CTL -> E_EVT : verificar póster, pago inicial si es renta y tarifario completo si es Comercial
+alt [requisitos completos (T-2.3)]
+  critical [transacción atómica · congelar tarifario y generar inventario]
+    CAR_CTL -> E_EVT : estado = PUBLICADO
+    opt [modalidad == COMERCIAL]
+      CAR_CTL -> INV_CTL : generar DisponibilidadButaca (bulk_create para butacas asignadas)
+      INV_CTL -> E_DIS : crear filas en DISPONIBLE por función
+    end
+    CAR_CTL -> AUD_CTL : auditar publicación
+    AUD_CTL -> E_AUD : insertar registro
+  end
+  CAR_CTL --> UI_ADM : 200 {estado: PUBLICADO}
+else [requisitos faltantes]
+  CAR_CTL --> UI_ADM -- : 409 REQUISITOS_PENDIENTES {detalle}
+end
+
+== UC5, UC6 y UC7 · Reprogramar función/evento y cancelar evento ==
+A -> UI_ADM : Reprograma función (o evento moviendo sus funciones)
+UI_ADM -> CAR_CTL ++ : POST /api/v1/cartelera/funciones/{id}/reprogramar/ {inicio_en, fin_en, bloques, motivo}
+critical [transacción atómica · T-2.9]
+  CAR_CTL -> AGD_CTL : mover bloqueos atómicamente (409 CRUCE_AGENDA si colisiona)
+  AGD_CTL -> E_AGD : actualizar bloqueos
+  CAR_CTL -> E_FUN : estado = REPROGRAMADO (conserva ID, boletos y QR vigentes)
+  CAR_CTL -> AUD_CTL : auditar reprogramación
+  AUD_CTL -> E_AUD : insertar registro
+end
+CAR_CTL ->> MAIL : notificar a compradores con cuenta (on_commit)
+CAR_CTL --> UI_ADM -- : 200 {horario_anterior, horario_nuevo}
+
+A -> UI_ADM : Cancela evento (causa TEATRO o ARRENDATARIO, liberar_agenda explícito)
+UI_ADM -> CAR_CTL ++ : POST /api/v1/cartelera/eventos/{id}/cancelar/ {causa, motivo, liberar_agenda}
+CAR_CTL -> E_EVT : cerrar ambos canales y marcar cancelado
+CAR_CTL -> E_BOL : invalidar boletos vigentes (INVALIDADO)
+opt [liberar_agenda == true]
+  CAR_CTL -> AGD_CTL : liberar bloqueo explícitamente
+  AGD_CTL -> E_AGD : estado = LIBERADO
+end
+CAR_CTL -> AUD_CTL : auditar cancelación
+AUD_CTL -> E_AUD : insertar registro
+CAR_CTL --> UI_ADM -- : 200 {estado, agenda_liberada}
+
+== UC11, UC12, UC13 y UC14 · Cortesías y bloqueos técnicos ==
+A -> UI_ADM : Emite cortesías ($0.00 MXN) o aplica bloqueo técnico en lote
+UI_ADM -> BOL_CTL ++ : POST /api/v1/boletos/funciones/{id}/cortesias/ {butacas, beneficiario?, motivo?}
+critical [transacción atómica · todo el lote o rollback]
+  BOL_CTL -> E_DIS : bloquear butacas (409 ASIENTO_NO_DISPONIBLE si alguna ocupada) y marcar CORTESIA
+  BOL_CTL -> E_COR : registrar cortesía
+  BOL_CTL -> E_BOL : emitir boletos con QR HMAC
+end
+BOL_CTL --> UI_ADM -- : 201 {boleto_ids, total: "0.00"}
+
+opt [revocar cortesía antes del ingreso (UC12)]
+  A -> UI_ADM : Revoca cortesía con motivo
+  UI_ADM -> BOL_CTL ++ : POST /api/v1/boletos/funciones/{id}/cortesias/{boleto_id}/revocar/ {motivo}
+  alt [boleto aún no usado (T-4.6)]
+    BOL_CTL -> E_BOL : estado = INVALIDADO
+    BOL_CTL -> E_DIS : restaurar a DISPONIBLE
+    BOL_CTL --> UI_ADM : 200 {invalidado}
+  else [ya ingresó]
+    BOL_CTL --> UI_ADM -- : 409 BOLETO_YA_USADO
+  end
+end
+
+A -> UI_ADM : Aplica o retira bloqueo técnico (UC13 / UC14)
+UI_ADM -> INV_CTL ++ : POST /api/v1/inventario/funciones/{id}/bloqueos/ {butacas, motivo}
+INV_CTL -> E_DIS : marcar BLOQUEO_TECNICO (todo el lote)
+INV_CTL -> E_BLQ : registrar bloqueo técnico
+INV_CTL --> UI_ADM -- : 201 {bloqueo_id}
+opt [retirar bloqueo técnico]
+  UI_ADM -> INV_CTL ++ : DELETE /api/v1/inventario/funciones/{id}/bloqueos/{bloqueo_id}/
+  INV_CTL -> E_DIS : restaurar a DISPONIBLE
+  INV_CTL --> UI_ADM -- : 204 No Content
+end
+@enduml

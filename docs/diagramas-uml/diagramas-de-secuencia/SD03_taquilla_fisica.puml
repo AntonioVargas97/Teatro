@@ -1,0 +1,105 @@
+@startuml SD03_taquilla_fisica
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam ParticipantPadding 10
+skinparam BoxPadding 8
+hide footbox
+autonumber
+title SD03 · Taquilla física (casos de uso 03)
+
+actor "Cajero" as C
+actor "Administrador" as A
+box "Operación interna /gestion/" #FFFFFF
+  boundary "TaquillaPanel" as UI
+end box
+control "CarteleraService" as CAR_CTL
+control "InventarioService" as INV_CTL
+control "VentasService" as VTA_CTL
+control "BoletosService" as BOL_CTL
+control "AuditoriaService" as AUD_CTL
+entity "Funcion" as E_FUN
+entity "DisponibilidadButaca" as E_DIS
+entity "OrdenCompra" as E_OC
+entity "OrdenCompraDetalle" as E_OCD
+entity "PagoOrden" as E_PAG
+entity "Boleto" as E_BOL
+entity "RegistroAuditoria" as E_AUD
+
+== UC2 y UC3 · Consultar funciones y mapa de asientos ==
+C -> UI : Selecciona función en taquilla
+UI -> CAR_CTL ++ : GET /api/v1/cartelera/funciones/{id}/
+CAR_CTL -> E_FUN : obtener función y margen de cierre de taquilla (0 min)
+CAR_CTL --> UI -- : 200 {funcion, cierre_taquilla_min}
+UI -> INV_CTL ++ : GET /api/v1/inventario/funciones/{id}/mapa/
+INV_CTL -> E_DIS : consultar 1,728 butacas, fase vigente y precios
+INV_CTL --> UI -- : 200 {funcion_id, fase_venta_id, precios, butacas} + ETag
+UI --> C : Muestra mapa interactivo compartido
+
+== UC4 y UC8 · Seleccionar, apartar localidades y consultar carrito ==
+C -> UI : Selecciona hasta 10 localidades por operación
+UI -> VTA_CTL ++ : POST /api/v1/ventas/taquilla/apartar/ {funcion_id, butacas}
+critical [transacción atómica · NOWAIT: OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> OrdenCompraDetalle]
+  VTA_CTL -> E_OC : verificar límite <= 10 y ausencia de otra función activa
+  VTA_CTL -> E_DIS : bloquear butacas y marcar APARTADA
+  VTA_CTL -> E_OCD : registrar fase_venta_id y precio_unitario vigentes
+end
+alt [butacas libres y taquilla abierta (now < inicio_en)]
+  VTA_CTL --> UI : 200 {orden_id, estado: APARTADO, expira_en, detalle, total}
+else [conflicto de asiento, cambio de función o cierre 0 min]
+  VTA_CTL --> UI -- : 409 ASIENTO_NO_DISPONIBLE / CAMBIO_FUNCION / VENTA_CERRADA
+end
+UI --> C : Muestra carrito de taquilla
+
+opt [consultar carrito vigente]
+  C -> UI : Consulta operación en curso
+  UI -> VTA_CTL ++ : GET /api/v1/ventas/carrito/
+  VTA_CTL -> E_OC : leer carrito propio del cajero
+  VTA_CTL --> UI -- : 200 {carrito}
+end
+
+== UC7 · Cancelar operación de taquilla (o liberar localidades) ==
+opt [cajero cancela operación o libera asientos antes de cobrar]
+  C -> UI : Cancela operación de taquilla
+  UI -> VTA_CTL ++ : POST /api/v1/ventas/ordenes/{id}/liberar/ {butacas}
+  VTA_CTL -> E_OC : expirar orden si queda sin butacas
+  VTA_CTL -> E_DIS : restaurar butacas a DISPONIBLE
+  VTA_CTL --> UI -- : 200 {estado: EXPIRADA}
+  UI --> C : Localidades liberadas inmediatamente
+end
+
+== UC5 y UC6 · Registrar método de pago, emitir e imprimir boletos ==
+C -> UI : Registra cobro (EFECTIVO o TARJETA_TERMINAL externa)
+UI -> VTA_CTL ++ : POST /api/v1/ventas/taquilla/cobrar/ {orden_id, metodo_pago} (Idempotency-Key)
+critical [transacción atómica · T-3.4]
+  VTA_CTL -> E_OC : validar APARTADO vigente y taquilla abierta
+  break [orden expirada o función iniciada]
+    VTA_CTL --> UI : 409 ORDEN_EXPIRADA / VENTA_CERRADA
+  end
+  VTA_CTL -> E_OC : estado = PAGADA
+  VTA_CTL -> E_PAG : registrar pago (EFECTIVO o TARJETA_TERMINAL)
+  VTA_CTL -> E_DIS : marcar VENDIDA
+  VTA_CTL -> BOL_CTL : emitir boletos con folio_corto y QR HMAC
+  BOL_CTL -> E_BOL : crear filas en EMITIDO
+  VTA_CTL -> AUD_CTL : registrar venta presencial
+  AUD_CTL -> E_AUD : insertar registro inmutable
+end
+VTA_CTL --> UI -- : 200 {orden_id, estado: PAGADA, folio, total, boletos}
+UI -> BOL_CTL ++ : POST /api/v1/boletos/ordenes/{id}/impresiones/ {}
+BOL_CTL -> E_BOL : generar PDF (ReportLab) y registrar primera impresión
+BOL_CTL --> UI -- : 200 application/pdf
+UI --> C : Imprime boletos físicos
+
+== UC9 · Reimprimir boletos mediante número de orden ==
+A -> UI : Busca orden TAQUILLA PAGADA e ingresa motivo obligatorio
+UI -> BOL_CTL ++ : POST /api/v1/boletos/ordenes/{id}/impresiones/ {motivo}
+alt [motivo presente y orden presencial pagada]
+  BOL_CTL -> E_BOL : reutilizar mismos folios y QR; generar PDF
+  BOL_CTL -> AUD_CTL : auditar reimpresión excepcional
+  AUD_CTL -> E_AUD : insertar registro con motivo
+  BOL_CTL --> UI : 200 application/pdf
+else [sin motivo en reimpresión]
+  BOL_CTL --> UI -- : 400 MOTIVO_REQUERIDO
+end
+UI --> A : Entrega PDF reimpreso (mismo flujo disponible para Cajero)
+@enduml

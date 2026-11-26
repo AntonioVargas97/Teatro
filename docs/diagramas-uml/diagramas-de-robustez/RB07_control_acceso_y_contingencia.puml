@@ -1,0 +1,58 @@
+@startuml RB07_control_acceso_y_contingencia
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodesep 35
+skinparam ranksep 70
+left to right direction
+title RB07 Â· Control de acceso y contingencia (casos de uso 07)
+
+actor "Verificador" as VER
+actor "Administrador" as A
+
+boundary "ValidarAccesoPage" as B_VAL
+boundary "ContingenciaBoletosPage" as B_CON
+
+control "Validar boleto\npor QR (UC1)" as K_QR
+control "Verificar firma\nHMAC del token" as K_HMAC
+control "Validar por folio\ncorto (UC2)" as K_FOL
+control "Evaluar estado, funciÃ³n\ny ventana [-2 h, fin]" as K_VEN
+control "Registrar ingreso\n(candado NOWAIT)" as K_ING
+control "Activar modo\ncontingencia (UC3)" as K_ACT
+control "Exportar listado\nPDF/CSV (UC4)" as K_EXP
+control "Reconciliar folios\nen lote (UC5)" as K_REC
+control "Registrar auditorÃ­a" as K_AUD
+
+entity "Boleto" as E_BOL
+entity "Funcion" as E_FUN
+entity "ContingenciaFuncion" as E_CON
+entity "RegistroAuditoria" as E_AUD
+
+VER --> B_VAL
+A --> B_VAL
+A --> B_CON
+
+B_VAL --> K_QR
+K_QR --> K_HMAC
+K_QR --> K_VEN
+B_VAL --> K_FOL
+K_FOL --> K_VEN
+K_FOL --> K_AUD
+K_VEN --> E_BOL
+K_VEN --> E_FUN
+K_VEN --> K_ING
+K_ING --> E_BOL
+K_ING --> B_VAL : resultado y mensaje
+
+B_CON --> K_ACT
+K_ACT --> E_CON
+K_ACT --> K_AUD
+B_CON --> K_EXP
+K_EXP --> E_FUN
+K_EXP --> E_BOL
+K_EXP --> K_AUD
+B_CON --> K_REC
+K_REC --> E_BOL
+K_REC --> E_CON
+K_REC --> K_AUD
+K_AUD --> E_AUD
+@enduml

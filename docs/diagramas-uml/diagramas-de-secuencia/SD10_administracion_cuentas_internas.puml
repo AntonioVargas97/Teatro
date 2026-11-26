@@ -1,0 +1,48 @@
+@startuml SD10_administracion_cuentas_internas
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam ParticipantPadding 10
+skinparam BoxPadding 8
+hide footbox
+autonumber
+title SD10 · Administración de cuentas internas (casos de uso 10)
+
+actor "Administrador" as A
+box "Operación interna /gestion/" #FFFFFF
+  boundary "AdminPersonalPage" as UI
+end box
+control "UsuariosService" as USR_CTL
+control "AuditoriaService" as AUD_CTL
+entity "Usuario" as E_USR
+entity "RegistroAuditoria" as E_AUD
+
+== UC1 · Gestionar usuarios (listar, crear, editar rol y suspender) ==
+A -> UI : Abre módulo de personal interno
+UI -> USR_CTL ++ : GET /api/v1/usuarios/cuentas/
+USR_CTL -> E_USR : listar cuentas paginadas
+USR_CTL --> UI -- : 200 {count, results}
+UI --> A : Muestra catálogo de cuentas internas
+
+alt [crear cuenta interna (Cajero, Verificador o Admin)]
+  A -> UI : Captura nombre, apellidos, correo, rol (C/V/A) y password
+  UI -> USR_CTL ++ : POST /api/v1/usuarios/cuentas/ {nombre, apellidos, correo, rol, password}
+  USR_CTL -> E_USR : crear cuenta interna con contraseña hasheada
+  USR_CTL -> AUD_CTL : auditar alta de cuenta
+  AUD_CTL -> E_AUD : insertar registro
+  USR_CTL --> UI -- : 201 {id, nombre, apellidos, correo, rol, activa: true}
+  UI --> A : Cuenta interna creada
+else [editar datos, cambiar rol o suspender cuenta (activa: false)]
+  A -> UI : Modifica rol o desactiva cuenta seleccionada
+  UI -> USR_CTL ++ : PATCH /api/v1/usuarios/cuentas/{id}/ {nombre?, apellidos?, rol?, activa?}
+  alt [intenta suspenderse o degradarse a sí mismo]
+    USR_CTL --> UI : 409 ADMIN_PROPIO
+  else [operación permitida]
+    USR_CTL -> E_USR : actualizar cuenta (si cambió rol o activa == false, incrementar session_version y revocar sesiones en Redis)
+    USR_CTL -> AUD_CTL : auditar cambio / suspensión
+    AUD_CTL -> E_AUD : insertar registro
+    USR_CTL --> UI -- : 200 {id, nombre, apellidos, correo, rol, activa}
+  end
+  UI --> A : Muestra cuenta actualizada
+end
+@enduml

@@ -1,0 +1,90 @@
+@startuml SD07_control_acceso_y_contingencia
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam ParticipantPadding 10
+skinparam BoxPadding 8
+hide footbox
+autonumber
+title SD07 · Control de acceso y contingencia (casos de uso 07)
+
+actor "Verificador" as VER
+actor "Administrador" as A
+box "Operación interna /gestion/" #FFFFFF
+  boundary "ValidarAccesoPage" as UI_VAL
+  boundary "ContingenciaBoletosPage" as UI_CON
+end box
+control "BoletosService" as BOL_CTL
+control "AuditoriaService" as AUD_CTL
+entity "Boleto" as E_BOL
+entity "Funcion" as E_FUN
+entity "ContingenciaFuncion" as E_CON
+entity "RegistroAuditoria" as E_AUD
+
+== UC1 y UC2 · Validar boleto por QR (100% online) o folio corto ==
+VER -> UI_VAL : Escanea QR con cámara (o ingresa folio_corto + funcion_id si falla cámara)
+UI_VAL -> BOL_CTL ++ : POST /api/v1/boletos/validar/ {token, funcion_id?} o {folio_corto, funcion_id}
+alt [validación por token QR]
+  BOL_CTL -> BOL_CTL : verificar firma HMAC-SHA256 (QR_HMAC_SECRET)
+else [respaldo manual por folio_corto (UC2)]
+  BOL_CTL -> BOL_CTL : validar rol VERIFICADOR/ADMIN y funcion_id obligatoria
+end
+critical [transacción atómica · SELECT ... FOR UPDATE OF boleto NOWAIT (sin bloquear Función)]
+  BOL_CTL -> E_BOL : bloquear fila del boleto
+  break [candado ocupado por otra puerta simultánea]
+    BOL_CTL --> UI_VAL : 409 VALIDACION_EN_CURSO (reintentar sin consumir boleto)
+  end
+  BOL_CTL -> E_FUN : comprobar correspondencia de función y ventana [inicio_en - 2 h, fin_en]
+  alt [entrada/firma inválida o boleto/función cancelado]
+    BOL_CTL --> UI_VAL : 400 BOLETO_INVALIDO ("Boleto no válido")
+  else [boleto o folio inexistente]
+    BOL_CTL -> AUD_CTL : auditar intento fallido (si fue folio manual)
+    AUD_CTL -> E_AUD : insertar registro
+    BOL_CTL --> UI_VAL : 404 BOLETO_NO_ENCONTRADO ("Boleto no válido")
+  else [boleto ya usado previamente]
+    BOL_CTL --> UI_VAL : 409 BOLETO_YA_USADO ("Ya ingresó a las HH:MM")
+  else [función de puerta distinta a la del boleto]
+    BOL_CTL --> UI_VAL : 409 OTRA_FUNCION ("Boleto de la función DD/MM HH:MM")
+  else [antes de la ventana o después del fin]
+    BOL_CTL --> UI_VAL : 422 ACCESO_ANTICIPADO / FUNCION_CONCLUIDA
+  else [válido, dentro de ventana y sin uso previo (T-4.7)]
+    BOL_CTL -> E_BOL : estado = USADO, usado_en = NOW(), validado_por = operador
+    BOL_CTL --> UI_VAL -- : 200 ACCESO_PERMITIDO {seccion, fila, asiento}
+  end
+end
+UI_VAL --> VER : Muestra resultado en pantalla (mismo flujo disponible para Admin en soporte)
+
+== UC4 · Exportar listado de control de folios (desde 24 h antes) ==
+A -> UI_CON : Solicita listado de folios (formato=pdf o csv)
+UI_CON -> BOL_CTL ++ : GET /api/v1/boletos/funciones/{id}/contingencia/listado/?formato=pdf|csv
+BOL_CTL -> E_FUN : validar que faltan <= 24 h para la función
+alt [dentro de ventana <= 24 h]
+  BOL_CTL -> E_BOL : listar boletos y cortesías vigentes (folio_corto, seccion_subseccion, fila, asiento)
+  BOL_CTL -> AUD_CTL : auditar descarga de listado
+  AUD_CTL -> E_AUD : insertar registro
+  BOL_CTL --> UI_CON : 200 PDF (ReportLab) o CSV
+else [descarga anticipada > 24 h]
+  BOL_CTL --> UI_CON -- : 409 LISTADO_NO_DISPONIBLE
+end
+UI_CON --> A : Descarga listado de respaldo
+
+== UC3 y UC5 · Activar modo contingencia y reconciliar folios en lote ==
+A -> UI_CON : Activa contingencia para función comercial
+UI_CON -> BOL_CTL ++ : POST /api/v1/boletos/funciones/{id}/contingencia/activar/
+BOL_CTL -> E_CON : abrir ContingenciaFuncion (solo una abierta por función)
+BOL_CTL -> AUD_CTL : auditar activación
+AUD_CTL -> E_AUD : insertar registro
+BOL_CTL --> UI_CON -- : 200 {contingencia_id, activada_en}
+UI_CON --> A : Contingencia activa
+
+A -> UI_CON : Carga CSV (columna folio_corto) o lista JSON de folios atendidos
+UI_CON -> BOL_CTL ++ : POST /api/v1/boletos/funciones/{id}/contingencia/reconciliar/ {archivo | folios}
+critical [transacción atómica · T-4.8 y cierre de contingencia]
+  BOL_CTL -> E_BOL : marcar nuevos ingresos como USADO_CONTINGENCIA; conservar USADO previos
+  BOL_CTL -> E_CON : guardar conteos (aplicados, ya_usados, rechazados) y cerrar contingencia
+  BOL_CTL -> AUD_CTL : auditar reconciliación y cierre
+  AUD_CTL -> E_AUD : insertar registro
+end
+BOL_CTL --> UI_CON -- : 200 {aplicados, ya_usados, rechazados}
+UI_CON --> A : Muestra resumen de reconciliación
+@enduml

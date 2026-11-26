@@ -1,0 +1,138 @@
+@startuml SD05_arrendamiento_administrador
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam ParticipantPadding 10
+skinparam BoxPadding 8
+hide footbox
+autonumber
+title SD05 · Gestión administrativa de arrendamientos y agenda (casos de uso 05)
+
+actor "Administrador" as A
+box "Operación interna /gestion/" #FFFFFF
+  boundary "AdminAgendaSolicitudesPage" as UI
+end box
+control "AgendaService" as AGD_CTL
+control "CotizacionesService" as COT_CTL
+control "AuditoriaService" as AUD_CTL
+entity "BloqueoAgenda" as E_AGD
+entity "Cotizacion" as E_COT
+entity "CotizacionVersion" as E_VER
+entity "CotizacionParametros" as E_PAR
+entity "CuotaArrendamiento" as E_CUO
+entity "PropuestaFecha" as E_PRO
+entity "RevisionPagoExtemporaneo" as E_RPE
+entity "CancelacionArrendamiento" as E_CAN
+entity "RegistroAuditoria" as E_AUD
+participant "Stripe Sandbox" as ST <<sistema>>
+participant "Servicio SMTP" as MAIL <<sistema>>
+
+== UC1 · Consultar calendario de disponibilidad ==
+A -> UI : Abre calendario por intervalo (FullCalendar)
+UI -> AGD_CTL ++ : GET /api/v1/agenda/bloqueos/?inicio_en=&fin_en=
+AGD_CTL -> E_AGD : consultar bloques activos (RENTA, FUNCION, MANTENIMIENTO)
+AGD_CTL --> UI -- : 200 {count, results}
+UI --> A : Muestra ocupación del recinto
+
+== UC2, UC3, UC4 y UC5 · Gestionar, aprobar, rechazar o proponer alternativas ==
+A -> UI : Revisa solicitudes (indicadores SLA 3/5 días hábiles)
+UI -> COT_CTL ++ : GET /api/v1/cotizaciones/
+COT_CTL -> E_COT : listar con indicadores de atraso y proximidad
+COT_CTL --> UI -- : 200 {count, results}
+
+alt [UC3 · aprobar cotización (T-1.6)]
+  opt [ajustar monto oficial antes de aprobar]
+    A -> UI : Registra nueva versión de monto oficial
+    UI -> COT_CTL ++ : POST /api/v1/cotizaciones/{id}/versiones/ {monto_oficial, nota?}
+    COT_CTL -> E_VER : crear versión consecutiva inmutable
+    COT_CTL --> UI -- : 201 {version_id, numero}
+  end
+  A -> UI : Aprueba solicitud con monto oficial
+  UI -> COT_CTL ++ : POST /api/v1/cotizaciones/{id}/aprobar/ {monto_oficial, asistentes_acordados?}
+  critical [transacción atómica · NOWAIT + ExclusionConstraint]
+    COT_CTL -> AGD_CTL : crear BloqueoAgenda PRE_RESERVADO (48 h)
+    AGD_CTL -> E_AGD : insertar rango [inicio, fin)
+    break [traslape en agenda]
+      AGD_CTL --> COT_CTL : IntegrityError
+      COT_CTL --> UI : 409 CRUCE_AGENDA
+    end
+    COT_CTL -> E_PAR : fijar snapshot (>30 d: 50/50 corte D-21; <=30 d: 100%)
+    COT_CTL -> E_CUO : crear cuotas (ROUND_HALF_UP)
+    COT_CTL -> E_COT : estado = PRE_RESERVADO
+    COT_CTL -> AUD_CTL : auditar aprobación
+    AUD_CTL -> E_AUD : insertar registro
+  end
+  COT_CTL ->> MAIL : notificar aprobación y enlace de pago (on_commit)
+  COT_CTL --> UI -- : 200 {estado: PRE_RESERVADO, esquema_pago, monto_anticipo, saldo, pre_reserva_expira_en}
+else [UC4 · rechazar solicitud (T-1.5)]
+  A -> UI : Ingresa motivo de rechazo
+  UI -> COT_CTL ++ : POST /api/v1/cotizaciones/{id}/rechazar/ {motivo}
+  COT_CTL -> AGD_CTL : liberar retención si provenía de alternativa
+  AGD_CTL -> E_AGD : estado = LIBERADO
+  COT_CTL -> E_COT : estado = RECHAZADA
+  COT_CTL -> AUD_CTL : auditar rechazo
+  AUD_CTL -> E_AUD : insertar registro
+  COT_CTL ->> MAIL : notificar rechazo (on_commit)
+  COT_CTL --> UI -- : 200 {estado: RECHAZADA}
+else [UC5 · proponer fechas alternativas (T-1.1)]
+  A -> UI : Captura de 1 a 3 opciones disjuntas y libres
+  UI -> COT_CTL ++ : POST /api/v1/cotizaciones/{id}/alternativas/ {opciones, motivo?}
+  critical [transacción atómica · retener 1..3 opciones por 48 h]
+    COT_CTL -> AGD_CTL : retener bloques propuestos
+    AGD_CTL -> E_AGD : insertar retenciones (409 CRUCE_AGENDA si colisionan)
+    COT_CTL -> E_PRO : registrar PropuestaFecha y OpcionPropuesta
+    COT_CTL -> E_COT : estado = PROPUESTA_RETENIDA
+  end
+  COT_CTL ->> MAIL : notificar propuestas alternativas (on_commit)
+  COT_CTL --> UI -- : 200 {estado: PROPUESTA_RETENIDA, opciones, vencimiento}
+end
+
+== UC6 · Resolver pago extemporáneo (ventana 72 h · T-1.11 / T-1.12) ==
+A -> UI : Decide ACEPTAR o RECHAZAR pago tardío
+UI -> COT_CTL ++ : POST /api/v1/cotizaciones/{id}/resolver-pago-extemporaneo/ {decision, motivo}
+alt [decision == ACEPTAR y agenda sigue libre]
+  COT_CTL -> AGD_CTL : consolidar BloqueoAgenda
+  AGD_CTL -> E_AGD : confirmar bloque
+  COT_CTL -> E_RPE : resolucion = ACEPTADO
+  COT_CTL -> E_COT : estado = CONFIRMADO
+else [decision == RECHAZAR o colisión de agenda]
+  COT_CTL -> AGD_CTL : liberar bloque retenido
+  AGD_CTL -> E_AGD : estado = LIBERADO
+  COT_CTL -> E_RPE : resolucion = RECHAZADO
+  opt [pago fue con tarjeta]
+    COT_CTL -> ST : ejecutar reembolso técnico 100%
+  end
+  note right of COT_CTL : Si fue ficha SPEI/efectivo queda en REEMBOLSO_BANCARIO_PENDIENTE\npara cierre manual con confirmar-reembolso-bancario/
+end
+COT_CTL -> AUD_CTL : auditar resolución
+AUD_CTL -> E_AUD : insertar registro
+COT_CTL --> UI -- : 200 {detalle actualizado}
+
+== UC7 · Cancelar arrendamiento (y liberación explícita de agenda) ==
+A -> UI : Resuelve solicitud de cancelación / reprogramación
+UI -> COT_CTL ++ : POST /api/v1/cotizaciones/{id}/cambios/{cambio_id}/resolver/ {decision, motivo, liberar_agenda?}
+COT_CTL -> E_CAN : registrar cancelación (retención 50%/100% según regla 21 d)
+COT_CTL -> E_COT : estado = CANCELADO_POR_ARRENDATARIO o CANCELADO_POR_TEATRO
+opt [liberación explícita autorizada]
+  COT_CTL -> AGD_CTL : liberar bloqueo explícitamente
+  AGD_CTL -> E_AGD : estado = LIBERADO
+end
+COT_CTL -> AUD_CTL : auditar cancelación
+AUD_CTL -> E_AUD : insertar registro
+COT_CTL --> UI -- : 200 {estado, efecto_agenda}
+
+== UC8 y UC9 · Registrar y liberar bloqueos de mantenimiento ==
+A -> UI : Registra mantenimiento [inicio_en, fin_en) y motivo
+UI -> AGD_CTL ++ : POST /api/v1/agenda/mantenimientos/ {inicio_en, fin_en, motivo}
+AGD_CTL -> E_AGD : insertar bloqueo MANTENIMIENTO (409 CRUCE_AGENDA si traslapa)
+AGD_CTL -> AUD_CTL : auditar alta
+AUD_CTL -> E_AUD : insertar registro
+AGD_CTL --> UI -- : 201 {bloqueo_id}
+
+A -> UI : Libera bloqueo de mantenimiento
+UI -> AGD_CTL ++ : POST /api/v1/agenda/mantenimientos/{id}/liberar/ {motivo}
+AGD_CTL -> E_AGD : estado = LIBERADO
+AGD_CTL -> AUD_CTL : auditar liberación
+AUD_CTL -> E_AUD : insertar registro
+AGD_CTL --> UI -- : 200 {bloqueo_id, estado: LIBERADO}
+@enduml

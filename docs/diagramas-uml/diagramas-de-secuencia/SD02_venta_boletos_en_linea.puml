@@ -1,0 +1,121 @@
+@startuml SD02_venta_boletos_en_linea
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam ParticipantPadding 10
+skinparam BoxPadding 8
+hide footbox
+autonumber
+title SD02 · Venta de boletos en línea (casos de uso 02)
+
+actor "Usuario estándar" as U
+box "Portal público /" #FFFFFF
+  boundary "PortalVentaUI\n(SeleccionButacas / Carrito / MisBoletos)" as UI
+end box
+control "InventarioService" as INV_CTL
+control "VentasService" as VTA_CTL
+control "PagosService" as PAG_CTL
+control "BoletosService" as BOL_CTL
+entity "Usuario" as E_USR
+entity "OrdenCompra" as E_OC
+entity "DisponibilidadButaca" as E_DIS
+entity "OrdenCompraDetalle" as E_OCD
+entity "Boleto" as E_BOL
+entity "WebhookStripe" as E_WH
+participant "Stripe Sandbox" as ST <<sistema>>
+queue "Celery" as Q
+participant "Servicio SMTP" as MAIL <<sistema>>
+
+== UC2 y UC3 · Seleccionar función y sondear mapa interactivo ==
+U -> UI : Selecciona función comercial publicada
+UI -> INV_CTL ++ : GET /api/v1/inventario/funciones/{id}/mapa/
+INV_CTL -> E_DIS : consultar butacas, fase_venta_id y precios
+INV_CTL --> UI -- : 200 {funcion_id, fase_venta_id, precios, butacas} + ETag
+loop [cada 10-15 s mientras la vista está activa]
+  UI -> INV_CTL ++ : GET /api/v1/inventario/funciones/{id}/disponibilidad/ (If-None-Match)
+  alt [sin cambios de fase ni disponibilidad]
+    INV_CTL --> UI : 304 Not Modified
+  else [cambió disponibilidad o fase_venta_id]
+    INV_CTL -> E_DIS : leer estados vigentes
+    INV_CTL --> UI -- : 200 {fase_venta_id, butacas} + nuevo ETag
+  end
+end
+
+== UC4 · Seleccionar y apartar localidades ==
+U -> UI : Selecciona butacas y confirma apartado
+UI -> VTA_CTL ++ : POST /api/v1/ventas/carrito/apartar/ {funcion_id, butacas}
+critical [transacción atómica · NOWAIT: Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> OrdenCompraDetalle]
+  VTA_CTL -> E_USR : bloquear fila y contar boletos acumulados <= 10
+  VTA_CTL -> E_OC : validar carrito único (o reemplazo si CAMBIO_FUNCION)
+  VTA_CTL -> E_DIS : bloquear butacas ordenadas y marcar APARTADA
+  VTA_CTL -> E_OCD : fijar fase_venta_id y precio_unitario vigentes
+end
+alt [butacas libres, cierre web -30 min vigente y <= 10 boletos]
+  VTA_CTL --> UI : 200 {orden_id, estado: APARTADO, expira_en, detalle, total}
+else [otra función en carrito]
+  VTA_CTL --> UI : 409 CAMBIO_FUNCION {orden_id}
+else [butaca ocupada, límite > 10 o venta cerrada]
+  VTA_CTL --> UI -- : 409 ASIENTO_NO_DISPONIBLE / LIMITE_BOLETOS / VENTA_CERRADA
+end
+UI --> U : Muestra carrito y temporizador (10 min)
+
+opt [usuario libera localidades antes de pagar]
+  U -> UI : Quita butacas del carrito
+  UI -> VTA_CTL ++ : POST /api/v1/ventas/ordenes/{id}/liberar/ {butacas}
+  VTA_CTL -> E_OC : actualizar detalle (si queda vacía -> EXPIRADA)
+  VTA_CTL -> E_DIS : restaurar butacas a DISPONIBLE
+  VTA_CTL --> UI -- : 200 {detalle restante, expira_en}
+end
+
+== UC5 · Procesar pago con tarjeta (Stripe Elements + Webhook) ==
+U -> UI : Confirma pago con tarjeta (CarritoPage)
+UI -> VTA_CTL ++ : POST /api/v1/ventas/checkout/ {orden_id} (Idempotency-Key)
+critical [transacción corta · validar vigencia y pasar a PAGO_EN_PROCESO]
+  VTA_CTL -> E_OC : verificar now() <= expira_en y cierre web -30 min
+  break [orden expirada o venta cerrada]
+    VTA_CTL -> E_OC : pasar a EXPIRADA y liberar butacas
+    VTA_CTL --> UI : 409 ORDEN_EXPIRADA / VENTA_CERRADA
+  end
+  VTA_CTL -> E_OC : estado = PAGO_EN_PROCESO, gracia_hasta = expira_en + 5 min
+end
+VTA_CTL -> ST ++ : crear o reutilizar PaymentIntent (fuera de lock BD)
+ST --> VTA_CTL -- : client_secret
+VTA_CTL -> E_OC : guardar payment_intent_id
+VTA_CTL --> UI -- : 200 {orden_id, estado, gracia_hasta, total, client_secret}
+UI -> ST : confirmar tarjeta con Stripe Elements
+ST ->> PAG_CTL : POST /api/v1/pagos/webhooks/stripe/ (Stripe-Signature)
+PAG_CTL -> PAG_CTL : verificar firma HMAC sobre cuerpo crudo
+PAG_CTL -> E_WH : registrar stripe_event_id idempotente (PENDIENTE)
+PAG_CTL ->> Q : encolar tarea de acreditación (on_commit)
+PAG_CTL --> ST : 200 OK
+Q -> VTA_CTL ++ : procesar payment_intent.succeeded
+critical [transacción atómica · candados ordenados]
+  VTA_CTL -> E_OC : verificar estado y vigencia (T-3.5 / T-3.7 / T-3.8)
+  alt [orden vigente o reasignable: función vigente, 100% libres y <= 10]
+    VTA_CTL -> E_OC : estado = PAGADA
+    VTA_CTL -> E_DIS : marcar VENDIDA
+    VTA_CTL -> BOL_CTL : emitir boletos con folio_corto y QR HMAC
+    BOL_CTL -> E_BOL : crear filas en estado EMITIDO
+    VTA_CTL ->> MAIL : enviar comprobante y boletos PDF (on_commit)
+  else [pago tardío sin disponibilidad, límite > 10 o función cancelada]
+    VTA_CTL -> ST : solicitar reembolso técnico 100% (Refund.create)
+    VTA_CTL -> E_OC : estado = REEMBOLSADA_AUTOMATICA
+    VTA_CTL ->> MAIL : notificar reembolso automático (on_commit)
+  end
+end
+deactivate VTA_CTL
+
+== UC6 y UC7 · Consultar órdenes y descargar boletos PDF ==
+U -> UI : Abre MisBoletosPage
+UI -> BOL_CTL ++ : GET /api/v1/boletos/
+BOL_CTL -> E_BOL : listar boletos del usuario titular
+BOL_CTL --> UI -- : 200 {count, results}
+UI --> U : Muestra órdenes y boletos
+opt [descargar archivo PDF]
+  U -> UI : Solicita descarga del boleto
+  UI -> BOL_CTL ++ : GET /api/v1/boletos/{id}/archivo/
+  BOL_CTL -> E_BOL : validar propiedad y generar PDF (ReportLab) con QR
+  BOL_CTL --> UI -- : 200 application/pdf
+  UI --> U : Descarga PDF
+end
+@enduml

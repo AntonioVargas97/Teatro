@@ -1,0 +1,52 @@
+@startuml RB09_supervision_ventas_y_cuentas
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodesep 35
+skinparam ranksep 70
+left to right direction
+title RB09 Â· SupervisiÃ³n de ventas y cuentas internas (casos de uso 09)
+
+actor "Administrador" as A
+
+boundary "AdminVentasAuditoriaPage" as B_VTA
+boundary "AdminPersonalPage" as B_PER
+
+control "Consultar ventas, pagos\ny reembolsos (UC1)" as K_VTA
+control "Administrar cuentas\ninternas (UC2)" as K_CTA
+control "Revocar sesiones" as K_SES
+control "Registrar anulaciÃ³n\nauditada (UC3)" as K_ANU
+control "Validar orden de taquilla\npagada sin boletos usados" as K_VAL
+control "Consultar bitÃ¡cora\nde auditorÃ­a (UC4)" as K_BIT
+control "Registrar auditorÃ­a" as K_AUD
+
+entity "OrdenCompra" as E_OC
+entity "PagoOrden" as E_PAG
+entity "ReembolsoOrden" as E_REE
+entity "Boleto" as E_BOL
+entity "Usuario" as E_USR
+entity "RegistroAuditoria" as E_AUD
+
+A --> B_VTA
+A --> B_PER
+
+B_VTA --> K_VTA
+K_VTA --> E_OC
+K_VTA --> E_PAG
+K_VTA --> E_REE
+
+B_PER --> K_CTA
+K_CTA --> E_USR
+K_CTA --> K_SES
+K_SES --> E_USR
+
+B_VTA --> K_ANU
+K_ANU --> K_VAL
+K_VAL --> E_OC
+K_VAL --> E_BOL
+K_ANU --> K_AUD
+
+B_VTA --> K_BIT
+K_BIT --> E_AUD
+K_CTA --> K_AUD
+K_AUD --> E_AUD
+@enduml

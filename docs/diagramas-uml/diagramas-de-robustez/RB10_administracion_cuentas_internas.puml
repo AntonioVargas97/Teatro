@@ -1,0 +1,41 @@
+@startuml RB10_administracion_cuentas_internas
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodesep 35
+skinparam ranksep 70
+left to right direction
+title RB10 Â· AdministraciÃ³n de cuentas internas (casos de uso 10)
+
+actor "Administrador" as A
+
+boundary "AdminPersonalPage" as B_PER
+
+control "Listar cuentas" as K_LIS
+control "Crear cuenta interna\n(Cajero, Verificador o Admin)" as K_ALT
+control "Editar datos o rol" as K_EDI
+control "Suspender o reactivar\ncuenta" as K_SUS
+control "Impedir autodegradaciÃ³n\n(409 ADMIN_PROPIO)" as K_PRO
+control "Revocar sesiones" as K_SES
+control "Registrar auditorÃ­a" as K_AUD
+
+entity "Usuario" as E_USR
+entity "RegistroAuditoria" as E_AUD
+
+A --> B_PER
+
+B_PER --> K_LIS
+K_LIS --> E_USR
+B_PER --> K_ALT
+K_ALT --> E_USR
+B_PER --> K_EDI
+K_EDI --> K_PRO
+B_PER --> K_SUS
+K_SUS --> K_PRO
+K_PRO --> E_USR
+K_PRO --> K_SES
+K_SES --> E_USR
+
+K_ALT --> K_AUD
+K_PRO --> K_AUD
+K_AUD --> E_AUD
+@enduml

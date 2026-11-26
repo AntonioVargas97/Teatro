@@ -1,0 +1,93 @@
+@startuml RB01_portal_publico_y_cuentas
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodesep 35
+skinparam ranksep 70
+left to right direction
+title RB01 Â· Portal pÃºblico y cuentas (casos de uso 01)
+
+actor "Visitante" as V
+actor "Usuario estÃ¡ndar" as U
+
+boundary "RegistroPage" as B_REG
+boundary "LegalPage" as B_LEG
+boundary "LoginPage" as B_LOG
+boundary "Header\n(menÃº de sesiÃ³n)" as B_HDR
+boundary "RecuperarPasswordPage" as B_REC
+boundary "CarteleraPage" as B_CAR
+boundary "EventoPage" as B_EVT
+boundary "SeleccionButacasPage" as B_MAP
+boundary "PerfilPage" as B_PER
+boundary "Correo SMTP" as B_MAIL
+
+control "Registrar cuenta\n(UC1)" as K_REG
+control "Validar aceptaciÃ³n\nde aviso y tÃ©rminos" as K_ACE
+control "Consultar aviso\ny tÃ©rminos (UC2)" as K_LEG
+control "Iniciar sesiÃ³n\n(UC3)" as K_LOG
+control "Cerrar sesiÃ³n\n(UC4)" as K_OUT
+control "Solicitar recuperaciÃ³n\nde contraseÃ±a (UC5)" as K_REC
+control "Enviar enlace\nde recuperaciÃ³n" as K_MAIL
+control "Restablecer contraseÃ±a\ncon token (UC6)" as K_RST
+control "Consultar cartelera\n(UC7)" as K_CAR
+control "Filtrar por fecha\ny categorÃ­a (UC8)" as K_FIL
+control "Consultar evento\n(UC9)" as K_EVT
+control "Consultar mapa y\ndisponibilidad (UC10)" as K_MAP
+control "Actualizar perfil\n(UC11)" as K_PER
+
+entity "Usuario" as E_USR
+entity "AceptacionLegal" as E_ACE
+entity "Categoria" as E_CAT
+entity "Evento" as E_EVT
+entity "Funcion" as E_FUN
+entity "DisponibilidadButaca" as E_DIS
+entity "PrecioSeccion" as E_PRE
+
+V --> B_REG
+V --> B_CAR
+V --> B_EVT
+V --> B_MAP
+U --> B_LOG
+U --> B_HDR
+U --> B_REC
+U --> B_CAR
+U --> B_EVT
+U --> B_MAP
+U --> B_PER
+
+B_REG --> K_REG
+K_REG --> K_ACE
+K_ACE --> E_ACE
+K_REG --> E_USR
+B_REG --> K_LEG
+K_LEG --> B_LEG
+
+B_LOG --> K_LOG
+K_LOG --> E_USR
+B_HDR --> K_OUT
+K_OUT --> E_USR
+
+B_REC --> K_REC
+K_REC --> E_USR
+K_REC --> K_MAIL
+K_MAIL --> B_MAIL
+B_REC --> K_RST
+K_RST --> E_USR
+
+B_CAR --> K_CAR
+K_CAR --> E_EVT
+K_CAR --> E_FUN
+B_CAR --> K_FIL
+K_FIL --> E_CAT
+K_FIL --> K_CAR
+
+B_EVT --> K_EVT
+K_EVT --> E_EVT
+K_EVT --> E_FUN
+
+B_MAP --> K_MAP
+K_MAP --> E_DIS
+K_MAP --> E_PRE
+
+B_PER --> K_PER
+K_PER --> E_USR
+@enduml

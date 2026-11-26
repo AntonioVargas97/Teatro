@@ -1,0 +1,95 @@
+@startuml RB05_arrendamiento_administrador
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodesep 35
+skinparam ranksep 70
+left to right direction
+title RB05 Â· GestiÃ³n administrativa de arrendamientos y agenda (casos de uso 05)
+
+actor "Administrador" as A
+actor "Celery Beat" as CB
+
+boundary "AdminAgendaSolicitudesPage" as B_ADM
+boundary "Tarea expirar_retenciones_agenda" as B_TSK
+boundary "Correo SMTP" as B_MAIL
+
+control "Consultar calendario\n(UC1)" as K_CAL
+control "Revisar solicitudes\n(UC2)" as K_REV
+control "Ajustar monto oficial\n(nueva versiÃ³n)" as K_VER
+control "Aprobar cotizaciÃ³n\n(UC3)" as K_APR
+control "Rechazar solicitud\n(UC4)" as K_RCH
+control "Proponer fechas\nalternativas (UC5)" as K_ALT
+control "Resolver pago\nextemporÃ¡neo (UC6)" as K_EXT
+control "Cancelar arrendamiento\n(UC7)" as K_CAN
+control "Registrar bloqueo de\nmantenimiento (UC8)" as K_MNT
+control "Liberar bloqueo de\nmantenimiento (UC9)" as K_LIB
+control "Reservar, retener o liberar\nagenda (AgendaService)" as K_AGD
+control "Expirar retenciones\ny pre-reservas" as K_EXP
+control "Registrar auditorÃ­a" as K_AUD
+control "Notificar al solicitante" as K_MAIL
+
+entity "BloqueoAgenda" as E_AGD
+entity "Cotizacion" as E_COT
+entity "CotizacionVersion" as E_VER
+entity "CotizacionParametros" as E_PAR
+entity "CuotaArrendamiento" as E_CUO
+entity "PropuestaFecha" as E_PRO
+entity "OpcionPropuesta" as E_OPC
+entity "RevisionPagoExtemporaneo" as E_RPE
+entity "ReembolsoArrendamiento" as E_REE
+entity "CancelacionArrendamiento" as E_CAN
+entity "RegistroAuditoria" as E_AUD
+
+A --> B_ADM
+CB --> B_TSK
+
+B_ADM --> K_CAL
+K_CAL --> E_AGD
+B_ADM --> K_REV
+K_REV --> E_COT
+K_REV --> K_VER
+K_VER --> E_VER
+
+B_ADM --> K_APR
+K_APR --> E_VER
+K_APR --> E_PAR
+K_APR --> E_CUO
+K_APR --> K_AGD
+B_ADM --> K_RCH
+K_RCH --> E_COT
+K_RCH --> K_AGD
+B_ADM --> K_ALT
+K_ALT --> E_PRO
+K_ALT --> E_OPC
+K_ALT --> K_AGD
+
+B_ADM --> K_EXT
+K_EXT --> E_RPE
+K_EXT --> E_REE
+K_EXT --> K_AGD
+B_ADM --> K_CAN
+K_CAN --> E_CAN
+K_CAN --> E_COT
+K_CAN --> K_AGD
+
+B_ADM --> K_MNT
+K_MNT --> K_AGD
+B_ADM --> K_LIB
+K_LIB --> K_AGD
+K_AGD --> E_AGD
+
+B_TSK --> K_EXP
+K_EXP --> E_COT
+K_EXP --> K_AGD
+
+K_APR --> K_AUD
+K_RCH --> K_AUD
+K_ALT --> K_AUD
+K_EXT --> K_AUD
+K_CAN --> K_AUD
+K_AUD --> E_AUD
+K_APR --> K_MAIL
+K_RCH --> K_MAIL
+K_ALT --> K_MAIL
+K_MAIL --> B_MAIL
+@enduml

@@ -1,0 +1,123 @@
+@startuml RB06_eventos_tarifas_y_publicacion
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodesep 30
+skinparam ranksep 70
+left to right direction
+title RB06 Â· Eventos, tarifas y publicaciÃ³n (casos de uso 06)
+
+actor "Administrador" as A
+actor "Usuario estÃ¡ndar" as U
+
+boundary "AdminEventosPage" as B_ADM
+boundary "ConfiguradorTarifas\n(portal, arrendamiento propio)" as B_CFG
+boundary "Correo SMTP" as B_MAIL
+
+control "Registrar evento\ndirecto (UC1)" as K_ALT
+control "Consultar datos\nde evento (UC2)" as K_CON
+control "Editar datos\nde evento (UC3)" as K_EDI
+control "Administrar\nfunciones (UC4)" as K_FUN
+control "Reprogramar funciÃ³n\n(UC5)" as K_RPF
+control "Reprogramar evento\n(UC6)" as K_RPE
+control "Cancelar evento\n(UC7)" as K_CAN
+control "Validar requisitos\nde publicaciÃ³n" as K_REQ
+control "Publicar evento y\ncongelar tarifario (UC8)" as K_PUB
+control "Generar inventario\npor funciÃ³n" as K_INV
+control "Cargar pÃ³ster\n(UC9)" as K_POS
+control "Configurar secciones,\nfases y tarifas (UC10)" as K_TAR
+control "Validar propiedad\n(anti-IDOR)" as K_IDOR
+control "Emitir cortesÃ­as\n(UC11)" as K_COR
+control "Revocar cortesÃ­a\n(UC12)" as K_REV
+control "Aplicar bloqueo\ntÃ©cnico (UC13)" as K_BLQ
+control "Retirar bloqueo\ntÃ©cnico (UC14)" as K_RBL
+control "Reservar o liberar\nagenda (AgendaService)" as K_AGD
+control "Registrar auditorÃ­a" as K_AUD
+control "Notificar compradores" as K_MAIL
+
+entity "Evento" as E_EVT
+entity "Categoria" as E_CAT
+entity "BloqueEventoDirecto" as E_BED
+entity "Funcion" as E_FUN
+entity "ReprogramacionFuncion" as E_RPF
+entity "BloqueoAgenda" as E_AGD
+entity "SeccionEvento" as E_SEC
+entity "FaseVenta" as E_FAS
+entity "PrecioSeccion" as E_PRE
+entity "DisponibilidadButaca" as E_DIS
+entity "Cortesia" as E_COR
+entity "Boleto" as E_BOL
+entity "BloqueoTecnico" as E_BLQ
+entity "RegistroAuditoria" as E_AUD
+
+A --> B_ADM
+U --> B_CFG
+
+B_ADM --> K_ALT
+K_ALT --> E_EVT
+K_ALT --> E_BED
+K_ALT --> E_FUN
+K_ALT --> K_AGD
+B_ADM --> K_CON
+K_CON --> E_EVT
+B_ADM --> K_EDI
+K_EDI --> E_EVT
+K_EDI --> E_CAT
+B_ADM --> K_FUN
+K_FUN --> E_FUN
+
+B_ADM --> K_RPF
+K_RPF --> E_FUN
+K_RPF --> E_RPF
+K_RPF --> K_AGD
+K_RPF --> K_MAIL
+B_ADM --> K_RPE
+K_RPE --> K_RPF
+K_MAIL --> B_MAIL
+
+B_ADM --> K_CAN
+K_CAN --> E_EVT
+K_CAN --> E_BOL
+K_CAN --> K_AGD
+K_AGD --> E_AGD
+
+B_ADM --> K_PUB
+K_PUB --> K_REQ
+K_REQ --> E_EVT
+K_REQ --> E_PRE
+K_PUB --> E_SEC
+K_PUB --> K_INV
+K_INV --> E_DIS
+
+B_ADM --> K_POS
+B_CFG --> K_POS
+K_POS --> K_IDOR
+K_POS --> E_EVT
+B_ADM --> K_TAR
+B_CFG --> K_TAR
+K_TAR --> K_IDOR
+K_IDOR --> E_EVT
+K_TAR --> E_SEC
+K_TAR --> E_FAS
+K_TAR --> E_PRE
+
+B_ADM --> K_COR
+K_COR --> E_DIS
+K_COR --> E_COR
+K_COR --> E_BOL
+B_ADM --> K_REV
+K_REV --> E_COR
+K_REV --> E_BOL
+K_REV --> E_DIS
+B_ADM --> K_BLQ
+K_BLQ --> E_BLQ
+K_BLQ --> E_DIS
+B_ADM --> K_RBL
+K_RBL --> E_BLQ
+K_RBL --> E_DIS
+
+K_CAN --> K_AUD
+K_PUB --> K_AUD
+K_COR --> K_AUD
+K_BLQ --> K_AUD
+K_AUD --> E_AUD
+@enduml

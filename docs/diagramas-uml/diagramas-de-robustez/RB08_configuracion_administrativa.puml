@@ -1,0 +1,45 @@
+@startuml RB08_configuracion_administrativa
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodesep 35
+skinparam ranksep 70
+left to right direction
+title RB08 Â· ConfiguraciÃ³n administrativa (casos de uso 08)
+
+actor "Administrador" as A
+
+boundary "AdminConfiguracionPage" as B_CFG
+
+control "Administrar turnos\ny tarifas base (UC1)" as K_TUR
+control "Administrar catÃ¡logo\nde extras (UC2)" as K_EXT
+control "Configurar parÃ¡metros de\ncompra y taquilla (UC3)" as K_CMP
+control "Configurar polÃ­ticas de\ncancelaciÃ³n y reprogramaciÃ³n (UC4)" as K_POL
+control "Configurar parÃ¡metros de\ncotizaciones y agenda (UC5)" as K_COT
+control "Validar conjunto de\nparÃ¡metros resultante" as K_VAL
+control "Registrar auditorÃ­a" as K_AUD
+
+entity "Turno" as E_TUR
+entity "ServicioExtra" as E_EXT
+entity "ConfiguracionSistema" as E_CFG
+entity "RegistroAuditoria" as E_AUD
+
+A --> B_CFG
+
+B_CFG --> K_TUR
+K_TUR --> E_TUR
+B_CFG --> K_EXT
+K_EXT --> E_EXT
+B_CFG --> K_CMP
+B_CFG --> K_POL
+B_CFG --> K_COT
+K_CMP --> K_VAL
+K_POL --> K_VAL
+K_COT --> K_VAL
+K_VAL --> E_CFG
+K_VAL --> B_CFG : 400 si es invÃ¡lido
+
+K_TUR --> K_AUD
+K_EXT --> K_AUD
+K_VAL --> K_AUD
+K_AUD --> E_AUD
+@enduml

@@ -1,0 +1,108 @@
+@startuml SD01_portal_publico_y_cuentas
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam ParticipantPadding 10
+skinparam BoxPadding 8
+hide footbox
+autonumber
+title SD01 · Portal público y gestión de cuentas (casos de uso 01)
+
+actor "Visitante" as V
+actor "Usuario estándar" as U
+box "Portal público /" #FFFFFF
+  boundary "PortalWeb\n(Registro / Login / Cartelera / Perfil)" as UI
+end box
+control "UsuariosService" as USR_CTL
+control "CarteleraService" as CAR_CTL
+control "InventarioService" as INV_CTL
+entity "Usuario" as E_USR
+entity "AceptacionLegal" as E_ACE
+entity "Evento" as E_EVT
+entity "Funcion" as E_FUN
+entity "DisponibilidadButaca" as E_DIS
+participant "Servicio SMTP" as MAIL <<sistema>>
+
+== UC1 y UC2 · Registrarse y aceptar aviso de privacidad y términos ==
+V -> UI : Consulta aviso de privacidad y términos (LegalPage)
+V -> UI : Envía formulario de registro con casillas LFPDPPP
+UI -> USR_CTL ++ : GET /api/v1/usuarios/csrf/
+USR_CTL --> UI -- : 200 {"csrf": true} + cookie csrftoken
+UI -> USR_CTL ++ : POST /api/v1/usuarios/registro/ {nombre, apellidos, correo, password, acepta_privacidad, acepta_terminos}
+alt [datos válidos y aceptación legal completa]
+  USR_CTL -> E_USR : crear cuenta (rol USUARIO, sin abrir sesión)
+  USR_CTL -> E_ACE : registrar versiones vigentes de aviso y términos
+  USR_CTL --> UI : 201 {id, correo, rol: USUARIO}
+else [datos o aceptación inválidos]
+  USR_CTL --> UI -- : 400 DATOS_INVALIDOS
+end
+UI --> V : Muestra confirmación de registro
+
+== UC3 y UC4 · Iniciar sesión y cerrar sesión ==
+U -> UI : Ingresa correo y contraseña (LoginPage)
+UI -> USR_CTL ++ : POST /api/v1/usuarios/login/ {correo, password}
+USR_CTL -> E_USR : verificar credenciales y estado activo
+alt [credenciales válidas y cuenta activa]
+  USR_CTL --> UI : 200 {id, nombre, rol} + cookie HttpOnly (Redis)
+else [cuenta suspendida]
+  USR_CTL --> UI : 403 CUENTA_SUSPENDIDA
+else [credenciales inválidas]
+  USR_CTL --> UI -- : 401 CREDENCIALES_INVALIDAS
+end
+UI --> U : Sesión activa (si venía del mapa, recupera selección preliminar)
+
+U -> UI : Solicita cerrar sesión (Header)
+UI -> USR_CTL ++ : POST /api/v1/usuarios/logout/
+USR_CTL -> E_USR : revocar sesión en Redis
+USR_CTL --> UI -- : 200 {"autenticado": false}
+UI --> U : Regresa a vista pública
+
+== UC5 y UC6 · Recuperar contraseña y confirmar restablecimiento ==
+U -> UI : Solicita recuperación por correo (RecuperarPasswordPage)
+UI -> USR_CTL ++ : POST /api/v1/usuarios/recuperar-password/ {correo}
+USR_CTL -> E_USR : buscar cuenta por correo
+opt [cuenta existente]
+  USR_CTL ->> MAIL : enviar enlace {uid, token} (vigencia 30 min)
+end
+USR_CTL --> UI -- : 200 mensaje genérico de recepción
+UI --> U : Muestra confirmación genérica
+
+U -> UI : Abre enlace e ingresa nueva contraseña
+UI -> USR_CTL ++ : POST /api/v1/usuarios/recuperar-password/confirmar/ {uid, token, password_nuevo}
+USR_CTL -> E_USR : validar token de un uso, actualizar hash y revocar sesiones
+alt [token vigente y válido]
+  USR_CTL --> UI : 204 No Content
+else [token expirado o inválido]
+  USR_CTL --> UI -- : 400 DATOS_INVALIDOS
+end
+UI --> U : Contraseña restablecida
+
+== UC7, UC8, UC9 y UC10 · Consultar cartelera, filtrar, detalle y mapa ==
+V -> UI : Abre cartelera y aplica filtros (fecha, categoria_id)
+UI -> CAR_CTL ++ : GET /api/v1/cartelera/eventos/?fecha=&categoria_id=
+CAR_CTL -> E_EVT : listar eventos publicados (Comercial y Público)
+CAR_CTL -> E_FUN : adjuntar funciones visibles
+CAR_CTL --> UI -- : 200 {count, results}
+UI --> V : Muestra cartelera filtrada
+
+V -> UI : Selecciona un evento
+UI -> CAR_CTL ++ : GET /api/v1/cartelera/eventos/{id}/
+CAR_CTL -> E_EVT : consultar detalle (404 si Privado o no publicado)
+CAR_CTL --> UI -- : 200 {nombre, modalidad, categoria, poster, funciones}
+UI --> V : Muestra ficha del evento
+
+opt [modalidad == COMERCIAL]
+  V -> UI : Abre mapa de una función (SeleccionButacasPage)
+  UI -> INV_CTL ++ : GET /api/v1/inventario/funciones/{id}/mapa/
+  INV_CTL -> E_DIS : leer 1,728 butacas, fase_venta_id y precios
+  INV_CTL --> UI -- : 200 {funcion_id, fase_venta_id, precios, butacas} + ETag
+  UI --> V : Renderiza mapa (al intentar apartar sin sesión, redirige a LoginPage)
+end
+
+== UC11 · Gestionar perfil personal ==
+U -> UI : Edita datos propios (PerfilPage)
+UI -> USR_CTL ++ : PATCH /api/v1/usuarios/perfil/ {nombre, apellidos, telefono}
+USR_CTL -> E_USR : actualizar perfil del titular de sesión
+USR_CTL --> UI -- : 200 {perfil actualizado}
+UI --> U : Confirma cambios
+@enduml

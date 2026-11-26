@@ -1,0 +1,114 @@
+@startuml SD04_arrendamiento_usuario
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam ParticipantPadding 10
+skinparam BoxPadding 8
+hide footbox
+autonumber
+title SD04 · Cotización y seguimiento de arrendamiento del solicitante (casos de uso 04)
+
+actor "Usuario estándar" as U
+box "Portal público /" #FFFFFF
+  boundary "PortalArrendamientoUI\n(SolicitudRenta / DetalleCotizacion)" as UI
+end box
+control "ConfiguracionService" as CFG_CTL
+control "CotizacionesService" as COT_CTL
+control "AgendaService" as AGD_CTL
+control "PagosService" as PAG_CTL
+entity "ConfiguracionSistema" as E_CFG
+entity "Cotizacion" as E_COT
+entity "PropuestaFecha" as E_PRO
+entity "BloqueoAgenda" as E_AGD
+entity "CuotaArrendamiento" as E_CUO
+entity "PagoArrendamiento" as E_PAG
+entity "FichaPago" as E_FIC
+entity "WebhookStripe" as E_WH
+participant "Stripe Sandbox" as ST <<sistema>>
+queue "Celery" as Q
+participant "Servicio SMTP" as MAIL <<sistema>>
+
+== UC1 y UC2 · Capturar datos, estimar y solicitar cotización ==
+U -> UI : Abre formulario de solicitud de renta
+UI -> CFG_CTL ++ : GET /api/v1/configuracion/catalogos/
+CFG_CTL -> E_CFG : leer turnos, tarifas base y extras vigentes
+CFG_CTL --> UI -- : 200 {turnos, extras}
+U -> UI : Captura evento, modalidad, fechas/bloques, extras y asistentes (<= 1,728)
+UI -> COT_CTL ++ : POST /api/v1/cotizaciones/estimaciones/ {bloques, extras, asistentes_estimados, modalidad}
+COT_CTL --> UI -- : 200 {desglose, subtotal_referencial}
+U -> UI : Envía solicitud de cotización
+UI -> COT_CTL ++ : POST /api/v1/cotizaciones/ {datos, bloques, extras}
+alt [aforo <= 1,728 y bloques válidos]
+  COT_CTL -> E_COT : crear en EN_REVISION (sin bloquear agenda aún)
+  COT_CTL --> UI : 201 {cotizacion_id, estado: EN_REVISION, desglose}
+else [datos inválidos o aforo > 1,728]
+  COT_CTL --> UI -- : 400 DATOS_INVALIDOS
+end
+opt [póster opcional en solicitud]
+  UI -> COT_CTL ++ : PUT /api/v1/cotizaciones/{id}/poster/ (multipart <= 5 MB)
+  COT_CTL -> E_COT : guardar poster_url
+  COT_CTL --> UI -- : 200 {poster_url}
+end
+UI --> U : Muestra folio y comprobante descargable
+
+== UC3, UC4, UC5 y UC6 · Consultar estado y responder fechas alternativas ==
+U -> UI : Consulta seguimiento (DetalleCotizacionPage)
+UI -> COT_CTL ++ : GET /api/v1/cotizaciones/{id}/
+COT_CTL -> E_COT : validar propietario (anti-IDOR) y leer estado/propuestas
+COT_CTL --> UI -- : 200 {cotizacion, versiones, propuestas}
+UI --> U : Muestra estado y propuestas retenidas (48 h)
+
+opt [cotización en PROPUESTA_RETENIDA]
+  U -> UI : Acepta una opción o rechaza todas
+  UI -> COT_CTL ++ : POST /api/v1/cotizaciones/{id}/responder-alternativas/ {decision, opcion_id?}
+  critical [transacción atómica · T-1.2 / T-1.3]
+    COT_CTL -> E_PRO : verificar vigencia de 48 h
+    alt [decision == ACEPTAR]
+      COT_CTL -> AGD_CTL : liberar opciones no elegidas y mantener retención elegida
+      AGD_CTL -> E_AGD : actualizar bloqueos
+      COT_CTL -> E_COT : pasar a EN_REVISION
+    else [decision == RECHAZAR]
+      COT_CTL -> AGD_CTL : liberar todas las retenciones
+      AGD_CTL -> E_AGD : estado = LIBERADO
+      COT_CTL -> E_COT : pasar a PROPUESTA_EXPIRADA
+    end
+  end
+  COT_CTL --> UI -- : 200 {estado resultante}
+end
+
+== UC7, UC8, UC9 y UC10 · Realizar pago (Tarjeta o Ficha SPEI / Efectivo) ==
+U -> UI : Elige cuota pendiente (ANTICIPO_50, SALDO_50 o TOTAL_100) y método
+UI -> COT_CTL ++ : POST /api/v1/cotizaciones/{id}/pagos/ {concepto, metodo_pago} (Idempotency-Key)
+COT_CTL -> E_CUO : validar cuota pendiente, ventana 48 h y corte D-21
+break [ficha bloqueada en últimas 48 h pre-D-21 o sobre tope efectivo]
+  COT_CTL --> UI : 409 METODO_NO_DISPONIBLE {metodos_disponibles}
+end
+alt [metodo_pago == TARJETA]
+  COT_CTL -> ST ++ : crear PaymentIntent (metadata.modulo='cotizacion')
+  ST --> COT_CTL -- : client_secret
+  COT_CTL -> E_PAG : registrar pago PENDIENTE
+  COT_CTL --> UI : 201 {pago_id, importe, client_secret}
+  UI -> ST : confirmar tarjeta en Stripe Elements
+else [metodo_pago == SPEI o FICHA_EFECTIVO]
+  COT_CTL -> ST ++ : generar ficha con línea de captura
+  ST --> COT_CTL -- : instrucciones_ficha, expira_en
+  COT_CTL -> E_PAG : registrar pago PENDIENTE
+  COT_CTL -> E_FIC : guardar referencia y vencimiento
+  COT_CTL --> UI -- : 201 {pago_id, importe, instrucciones_ficha, expira_en}
+end
+ST ->> PAG_CTL : POST /api/v1/pagos/webhooks/stripe/ (Stripe-Signature)
+PAG_CTL -> E_WH : registrar evento idempotente
+PAG_CTL ->> Q : encolar acreditación de arrendamiento (on_commit)
+PAG_CTL --> ST : 200 OK
+Q -> COT_CTL ++ : acreditar pago (T-1.7 / T-1.9 / T-1.10 / T-1.13)
+COT_CTL -> E_PAG : marcar EXITOSO y actualizar cuota y cotización
+COT_CTL ->> MAIL : notificar confirmación o revisión extemporánea (on_commit)
+deactivate COT_CTL
+
+== UC11 y UC12 · Solicitar cancelación o reprogramación ==
+U -> UI : Solicita cancelación o reprogramación (>= 21 d para reprogramar)
+UI -> COT_CTL ++ : POST /api/v1/cotizaciones/{id}/cambios/ {tipo, motivo, bloques_propuestos?}
+COT_CTL -> E_COT : validar propietario y registrar solicitud para revisión Admin
+COT_CTL --> UI -- : 201 {cambio_id, tipo}
+UI --> U : Solicitud registrada en seguimiento
+@enduml

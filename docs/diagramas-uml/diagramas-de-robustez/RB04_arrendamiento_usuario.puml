@@ -1,0 +1,101 @@
+@startuml RB04_arrendamiento_usuario
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodesep 35
+skinparam ranksep 70
+left to right direction
+title RB04 Â· CotizaciÃ³n y arrendamiento del solicitante (casos de uso 04)
+
+actor "Usuario estÃ¡ndar" as U
+actor "Stripe" as ST
+
+boundary "SolicitudRentaPage" as B_SOL
+boundary "DetalleCotizacionPage" as B_DET
+boundary "Endpoint webhook Stripe" as B_WH
+boundary "Correo SMTP" as B_MAIL
+
+control "Calcular estimaciÃ³n\nreferencial (UC2)" as K_EST
+control "Registrar solicitud\nde cotizaciÃ³n (UC1)" as K_SOL
+control "Consultar estado\nde la solicitud (UC3)" as K_EDO
+control "Consultar propuestas\nalternativas (UC4)" as K_PRO
+control "Aceptar alternativa\n(UC5)" as K_ACE
+control "Rechazar alternativas\n(UC6)" as K_REC
+control "Retener o liberar\nagenda (AgendaService)" as K_AGD
+control "Iniciar pago de\narrendamiento (UC7)" as K_PAG
+control "Determinar mÃ©todos\ndisponibles (UC8)" as K_MET
+control "Generar ficha SPEI\no efectivo (UC9)" as K_FIC
+control "Crear PaymentIntent\nde tarjeta (UC10)" as K_TAR
+control "Verificar firma y\nregistrar evento" as K_WH
+control "Acreditar pago\nde arrendamiento" as K_ACR
+control "Solicitar cancelaciÃ³n\n(UC11)" as K_CAN
+control "Solicitar reprogramaciÃ³n\n(UC12)" as K_REP
+control "Notificar por correo" as K_MAIL
+
+entity "Turno" as E_TUR
+entity "ServicioExtra" as E_EXT
+entity "Cotizacion" as E_COT
+entity "BloqueSolicitado" as E_BLQ
+entity "CotizacionServicio" as E_CSV
+entity "CotizacionVersion" as E_VER
+entity "PropuestaFecha" as E_PRO
+entity "OpcionPropuesta" as E_OPC
+entity "BloqueoAgenda" as E_AGD
+entity "ConfiguracionSistema" as E_CFG
+entity "CuotaArrendamiento" as E_CUO
+entity "PagoArrendamiento" as E_PAG
+entity "FichaPago" as E_FIC
+entity "WebhookStripe" as E_WH
+
+U --> B_SOL
+U --> B_DET
+ST --> B_WH
+
+B_SOL --> K_EST
+K_EST --> E_TUR
+K_EST --> E_EXT
+B_SOL --> K_SOL
+K_SOL --> K_EST
+K_SOL --> E_COT
+K_SOL --> E_BLQ
+K_SOL --> E_CSV
+
+B_DET --> K_EDO
+K_EDO --> E_COT
+K_EDO --> E_VER
+B_DET --> K_PRO
+K_PRO --> E_PRO
+K_PRO --> E_OPC
+B_DET --> K_ACE
+K_ACE --> E_OPC
+K_ACE --> K_AGD
+B_DET --> K_REC
+K_REC --> E_PRO
+K_REC --> K_AGD
+K_AGD --> E_AGD
+
+B_DET --> K_PAG
+K_PAG --> E_CUO
+K_PAG --> K_MET
+K_MET --> E_CFG
+K_PAG --> K_FIC
+K_FIC --> E_FIC
+K_FIC --> E_PAG
+K_PAG --> K_TAR
+K_TAR --> E_PAG
+K_TAR --> B_DET : client_secret
+
+B_WH --> K_WH
+K_WH --> E_WH
+K_WH --> K_ACR
+K_ACR --> E_PAG
+K_ACR --> E_CUO
+K_ACR --> E_COT
+K_ACR --> K_MAIL
+K_MAIL --> B_MAIL
+
+B_DET --> K_CAN
+K_CAN --> E_COT
+B_DET --> K_REP
+K_REP --> E_COT
+K_REP --> E_BLQ
+@enduml

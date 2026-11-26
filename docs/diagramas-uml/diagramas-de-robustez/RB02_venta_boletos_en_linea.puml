@@ -1,0 +1,102 @@
+@startuml RB02_venta_boletos_en_linea
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodesep 35
+skinparam ranksep 70
+left to right direction
+title RB02 Â· Venta de boletos en lÃ­nea (casos de uso 02)
+
+actor "Usuario estÃ¡ndar" as U
+actor "Stripe" as ST
+actor "Celery Beat" as CB
+
+boundary "EventoPage" as B_EVT
+boundary "SeleccionButacasPage" as B_MAP
+boundary "CarritoPage\n(Stripe Elements)" as B_CRT
+boundary "ConfirmacionCompraPage" as B_CNF
+boundary "MisBoletosPage" as B_MIS
+boundary "Endpoint webhook Stripe" as B_WH
+boundary "Tarea expirar_carritos" as B_TSK
+boundary "Correo SMTP" as B_MAIL
+
+control "Seleccionar funciÃ³n\n(UC2)" as K_FUN
+control "Consultar mapa y sondear\ndisponibilidad (UC3)" as K_MAP
+control "Apartar localidades\n(UC4)" as K_APA
+control "Validar lÃ­mite <= 10\ny cierre web -30 min" as K_LIM
+control "Liberar localidades\no reemplazar carrito" as K_LIB
+control "Iniciar checkout\n(UC5)" as K_CHK
+control "Crear o reutilizar\nPaymentIntent" as K_PI
+control "Verificar firma y\nregistrar evento" as K_WH
+control "Confirmar pago y\nemitir boletos" as K_PAG
+control "Reasignar o reembolsar\npago tardÃ­o" as K_TAR
+control "Expirar Ã³rdenes\nvencidas" as K_EXP
+control "Notificar por correo" as K_MAIL
+control "Consultar Ã³rdenes\ny boletos (UC6)" as K_MIS
+control "Generar PDF de\nboletos (UC7)" as K_PDF
+
+entity "Funcion" as E_FUN
+entity "PrecioSeccion" as E_PRE
+entity "Usuario" as E_USR
+entity "OrdenCompra" as E_OC
+entity "OrdenCompraDetalle" as E_OCD
+entity "DisponibilidadButaca" as E_DIS
+entity "PagoOrden" as E_PAG
+entity "WebhookStripe" as E_WH
+entity "Boleto" as E_BOL
+entity "ReembolsoOrden" as E_REE
+
+U --> B_EVT
+U --> B_MAP
+U --> B_CRT
+U --> B_CNF
+U --> B_MIS
+ST --> B_WH
+CB --> B_TSK
+
+B_EVT --> K_FUN
+K_FUN --> E_FUN
+B_MAP --> K_MAP
+K_MAP --> E_DIS
+K_MAP --> E_PRE
+
+B_MAP --> K_APA
+K_APA --> K_LIM
+K_LIM --> E_USR
+K_LIM --> E_FUN
+K_APA --> E_OC
+K_APA --> E_OCD
+K_APA --> E_DIS
+B_CRT --> K_LIB
+K_LIB --> E_OC
+K_LIB --> E_DIS
+
+B_CRT --> K_CHK
+K_CHK --> E_OC
+K_CHK --> K_PI
+K_PI --> E_PAG
+K_PI --> B_CRT : client_secret
+
+B_WH --> K_WH
+K_WH --> E_WH
+K_WH --> K_PAG
+K_PAG --> E_OC
+K_PAG --> E_DIS
+K_PAG --> E_BOL
+K_PAG --> K_MAIL
+K_WH --> K_TAR
+K_TAR --> E_OC
+K_TAR --> E_REE
+K_TAR --> K_MAIL
+K_MAIL --> B_MAIL
+
+B_TSK --> K_EXP
+K_EXP --> E_OC
+K_EXP --> E_DIS
+
+B_CNF --> K_MIS
+B_MIS --> K_MIS
+K_MIS --> E_OC
+K_MIS --> E_BOL
+B_MIS --> K_PDF
+K_PDF --> E_BOL
+@enduml
