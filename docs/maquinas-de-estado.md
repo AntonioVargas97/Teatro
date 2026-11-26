@@ -2,7 +2,7 @@
 
 * **Proyecto:** Plataforma de Boletaje en Línea y Cotización de Arrendamiento — Teatro de la Ciudad de Coatzacoalcos
 * **Responsable Técnico:** José Manuel Fabian Hernández
-* **Versión:** 2.0 (Sincronizada con Alcance, Arquitectura y Stack Tecnológico)
+* **Versión:** 2.1 (Sincronizada con BD v6.2, Alcance, Arquitectura y Stack Tecnológico)
 * **Zona Horaria Oficial:** `America/Mexico_City` (persistiendo todos los *timestamps* en UTC)
 * **Estándares y Patrones Aplicados:** UML 2.5 State Machines, *Domain Services* con `TextChoices`, Separación de Responsabilidades (SoC), Idempotencia y Control de Concurrencia Pesimista.
 
@@ -25,8 +25,8 @@
 
 ### **2.1 Reglas de Diseño del Ciclo de Vida**
 
-* **Bloqueo temprano de agenda:** Una solicitud en `EN_REVISION` no bloquea fechas (la bandera SLA `atrasada = True` se activa a los `> 5 días hábiles` lunes–viernes sin atención, sin crear sub-estados). Los estados `PROPUESTA_RETENIDA`, `PRE_RESERVADO` y `CONFIRMADO` ocupan activamente los rangos de fecha/turno en `BloqueoAgenda` mediante la restricción `ExclusionConstraint` en PostgreSQL (`btree_gist`), impidiendo traslapes entre solicitudes.
-* **Esquema `50/50` vs. `100%` y sub-estado financiero en `CONFIRMADO`:** Al aprobar la cotización, el sistema congela como *snapshot* el esquema aplicable según los días naturales entre la aprobación y la primera fecha reservada (incluyendo montaje/ensayos): **`> 30 días naturales` (`>= 31 d`)** permite `50/50` (corte `D-21` + margen de `9 días`); **`<= 30 días naturales`** exige `100%` obligatorio en un solo pago. El anticipo `50%` se redondea a 2 decimales (`ROUND_HALF_UP`) y `saldo = total - anticipo`, venciendo a las `23:59:59` del día `D-21` (sin emisión de fichas Stripe en las últimas `48 h` previas a `D-21 23:59:59`). Un atributo secundario (`estado_liquidacion`: `ANTICIPO_50_PAGADO | LIQUIDADO_100 | REEMBOLSO_BANCARIO_PENDIENTE`) controla el cobro del saldo y las devoluciones bancarias externas de fichas SPEI/efectivo.
+* **Bloqueo temprano de agenda:** Una solicitud en `EN_REVISION` no bloquea fechas (el atraso SLA se calcula con `enviada_en` cuando pasan `> 5 días hábiles` lunes–viernes sin atención; no es columna ni sub-estado). Los estados `PROPUESTA_RETENIDA`, `PRE_RESERVADO` y `CONFIRMADO` ocupan activamente los rangos de fecha/turno en `BloqueoAgenda` mediante la restricción `ExclusionConstraint` en PostgreSQL (`btree_gist`), impidiendo traslapes entre solicitudes.
+* **Esquema `50/50` vs. `100%` y sub-estado financiero en `CONFIRMADO`:** Al aprobar la cotización, el sistema congela como *snapshot* el esquema aplicable según los días naturales entre la aprobación y la primera fecha reservada (incluyendo montaje/ensayos): **`> 30 días naturales` (`>= 31 d`)** permite `50/50` (corte `D-21` + margen de `9 días`); **`<= 30 días naturales`** exige `100%` obligatorio en un solo pago. El anticipo `50%` se redondea a 2 decimales (`ROUND_HALF_UP`) y `saldo = total - anticipo`, venciendo a las `23:59:59` del día `D-21` (sin emisión de fichas Stripe en las últimas `48 h` previas a `D-21 23:59:59`). El estado financiero (`ANTICIPO_50_PAGADO | LIQUIDADO_100 | REEMBOLSO_BANCARIO_PENDIENTE`) no se guarda: se calcula a partir de `cuota_arrendamiento` (`ANTICIPO_50`, `SALDO_50`, `TOTAL_100`) y de `reembolso_arrendamiento` (devoluciones bancarias externas de fichas SPEI/efectivo).
 
 ### **2.2 Diagrama de Estados (PlantUML)**
 
@@ -36,22 +36,22 @@
 
 | ID | Estado Origen | Evento / Disparador | Condición Guarda | Estado Destino | Efectos Secundarios y Auditoría |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **T-1.1** | `EN_REVISION` | `proponer_fechas_alt` | `1..3` opciones mutuamente disjuntas y libres en `AgendaService`. | `PROPUESTA_RETENIDA` | Inserta bloqueos en `BloqueoAgenda` por 48 h naturales y notifica por correo al solicitante. |
+| **T-1.1** | `EN_REVISION` | `proponer_fechas_alt` | `1..3` opciones mutuamente disjuntas y libres en `AgendaService`. | `PROPUESTA_RETENIDA` | Registra `propuesta_fecha` (`ALTERNATIVA`, con `motivo` visible para el solicitante) y sus `opcion_propuesta` (1 a 3); inserta bloqueos en `BloqueoAgenda` por 48 h naturales y notifica por correo al solicitante. |
 | **T-1.2** | `PROPUESTA_RETENIDA` | `aceptar_alternativa` | Dentro de 48 h y la opción elegida sigue retenida. | `EN_REVISION` | Libera las opciones no elegidas; mantiene retenida la elegida en `BloqueoAgenda` (sin expirar por 48 h) hasta que Admin apruebe tarifa oficial. |
 | **T-1.3** | `PROPUESTA_RETENIDA` | `expirar_o_rechazar` | Vencen 48 h o el solicitante rechaza todas. | `PROPUESTA_EXPIRADA` | Libera todas las fechas retenidas en `BloqueoAgenda` (`LIBERADO`). |
 | **T-1.4** | `EN_REVISION` | `expirar_por_fecha` | `now() > fecha_estimada` sin aprobación (`Celery Beat`). | `EXPIRADA_POR_FECHA` | Cierra solicitud vencida sin bloquear agenda. |
 | **T-1.5** | `EN_REVISION` | `rechazar_solicitud` | Admin rechaza la cotización. | `RECHAZADA` | Libera retención si provenía de `T-1.2` y notifica al solicitante. |
-| **T-1.6** | `EN_REVISION` | `aprobar_cotizacion` | Agenda libre en `AgendaService` para fechas solicitadas/elegidas. | `PRE_RESERVADO` | Guarda *snapshot* de configuración, evalúa umbral `> 30 días` (`50/50`) vs `<= 30 días` (`100%`), fija `pre_reserva_expira_en = +48 h` y bloquea `BloqueoAgenda`. |
-| **T-1.7** | `PRE_RESERVADO` | `webhook_pago_ok` | `now() <= pre_reserva_expira_en`. | `CONFIRMADO` | Registra pago (`ANTICIPO_50_PAGADO` o `LIQUIDADO_100`), consolida `BloqueoAgenda`, crea `Evento` (`PENDIENTE_PUBLICACION` u `OPERACION_SIN_CARTELERA` si es `Privado`) y sus `Funciones` iniciales. |
-| **T-1.8** | `PRE_RESERVADO` | `expirar_prereserva` | `now() > pre_reserva_expira_en` sin pago acreditado. | `EXPIRADA_SIN_PAGO` | Libera `BloqueoAgenda` (`LIBERADO`) y marca intento/ficha caducada. |
-| **T-1.9** | `EXPIRADA_SIN_PAGO` | `webhook_pago_tardio` | Pago confirmado tras 48 h y fecha aún libre (`ExclusionConstraint`). | `PAGO_EXTEMPORANEO_EN_REVISION` | Re-retiene bloque por `72 h` (`revision_extemporanea_expira_en`) y alerta al Admin. |
-| **T-1.10** | `EXPIRADA_SIN_PAGO` | `webhook_pago_tardio` | Pago confirmado tras 48 h y fecha ya ocupada (`IntegrityError`). | `EXPIRADA_SIN_PAGO` | Devolución íntegra del 100%: si fue **tarjeta**, ejecuta `Refund` vía Stripe API; si fue **ficha SPEI/efectivo**, marca `REEMBOLSO_BANCARIO_PENDIENTE` con alerta al Admin. |
-| **T-1.11** | `PAGO_EXTEMPORANEO_EN_REVISION` | `aceptar_extemporaneo` | Admin acepta dentro de 72 h. | `CONFIRMADO` | Consolida `BloqueoAgenda`, registra `ANTICIPO_50_PAGADO`/`LIQUIDADO_100` y crea `Evento`. |
-| **T-1.12** | `PAGO_EXTEMPORANEO_EN_REVISION` | `rechazar_o_expirar_72h` | Admin rechaza o `now() > revision_extemporanea_expira_en`. | `EXPIRADA_SIN_PAGO` | Libera `BloqueoAgenda` y devuelve 100%: **tarjeta** -> `Refund` Stripe; **ficha SPEI/efectivo** -> `REEMBOLSO_BANCARIO_PENDIENTE`. |
-| **T-1.13** | `CONFIRMADO` | `acreditar_saldo_50` | `esquema == 50/50`, `now() <= D-21 23:59:59` (sin fichas en últimas 48 h). | `CONFIRMADO` | Actualiza `estado_liquidacion = LIQUIDADO_100` y audita el pago. |
-| **T-1.14** | `CONFIRMADO` | `reprogramar` | Nueva fecha libre; si pide cliente: `>= 21 d` y 1ra vez gratis (si queda `< 21 d` con `ANTICIPO_50_PAGADO`, exige liquidar 100% previo). | `CONFIRMADO` | Operación atómica en `AgendaService` (libera bloque previo y crea nuevo), recalcula `D-21` y `fecha_limite_publicacion`, conserva boletos y marca `REPROGRAMADO` en `Función`. |
-| **T-1.15** | `CONFIRMADO` | `cancelar_arrendatario` / `incumplir_saldo_d21` | Solicitud cliente + Admin, o `50/50` sin saldo tras `D-21 23:59:59`. | `CANCELADO_POR_ARRENDATARIO` | Calcula retención (50% si pagó 100% y `>= 21 d`; 0% reembolso si `< 21 d` o solo anticipo), detiene venta, invalida QRs, conserva historial; agenda se libera solo por acción explícita de Admin. Si llega 2do 50% tardío post `D-21`, devuelve 100% (Stripe o `REEMBOLSO_BANCARIO_PENDIENTE`). |
-| **T-1.16** | `CONFIRMADO` | `cancelar_teatro` | Admin declara cancelación por Teatro o fuerza mayor. | `CANCELADO_POR_TEATRO` | 100% reembolso externo o reprogramación sin costo; detiene venta, invalida QRs y conserva padrón para devoluciones manuales. |
+| **T-1.6** | `EN_REVISION` | `aprobar_cotizacion` | Existe una `cotizacion_version` vigente (la de mayor `numero`; sin versiones no se puede aprobar). Agenda libre en `AgendaService` para fechas solicitadas/elegidas. | `PRE_RESERVADO` | Fija `cotizacion_parametros.version_aprobada_id` (FK compuesta a esa versión) y `asistentes_acordados`; guarda *snapshot* de configuración, evalúa umbral `> 30 días` (`50/50`) vs `<= 30 días` (`100%`), fija `bloqueo_agenda.expira_en = +48 h` y bloquea `BloqueoAgenda`. |
+| **T-1.7** | `PRE_RESERVADO` | `webhook_pago_ok` | `now() <= bloqueo_agenda.expira_en`. | `CONFIRMADO` | Registra `pago_arrendamiento` en `EXITOSO` sobre la cuota (`ANTICIPO_50` o `TOTAL_100`; el estado financiero `ANTICIPO_50_PAGADO` o `LIQUIDADO_100` se deriva), consolida `BloqueoAgenda`, crea `Evento` (`PENDIENTE_PUBLICACION` u `OPERACION_SIN_CARTELERA` si es `Privado`) y sus `Funciones` iniciales. |
+| **T-1.8** | `PRE_RESERVADO` | `expirar_prereserva` | `now() > bloqueo_agenda.expira_en` sin pago acreditado. | `EXPIRADA_SIN_PAGO` | Libera `BloqueoAgenda` (`LIBERADO`), marca la cuota `VENCIDA` y el `pago_arrendamiento` pendiente como `CANCELADO`. |
+| **T-1.9** | `EXPIRADA_SIN_PAGO` | `webhook_pago_tardio` | Pago confirmado tras 48 h y fecha aún libre (`ExclusionConstraint`). | `PAGO_EXTEMPORANEO_EN_REVISION` | Re-retiene bloque por `72 h` (`revision_pago_extemporaneo.expira_en`), registra el `pago_arrendamiento` en `EXTEMPORANEO` y alerta al Admin. |
+| **T-1.10** | `EXPIRADA_SIN_PAGO` | `webhook_pago_tardio` | Pago confirmado tras 48 h y fecha ya ocupada (`IntegrityError`). | `EXPIRADA_SIN_PAGO` | Devolución íntegra del 100% mediante `reembolso_arrendamiento`: si fue **tarjeta** (`AUTOMATICO_TARJETA`), ejecuta `Refund` vía Stripe API; si fue **ficha SPEI/efectivo** (`BANCARIO_EXTERNO`, `PENDIENTE`), el estado financiero queda `REEMBOLSO_BANCARIO_PENDIENTE` con alerta al Admin. |
+| **T-1.11** | `PAGO_EXTEMPORANEO_EN_REVISION` | `aceptar_extemporaneo` | Admin acepta dentro de 72 h. | `CONFIRMADO` | Consolida `BloqueoAgenda`, marca `revision_pago_extemporaneo.resolucion = ACEPTADO`, pasa el `pago_arrendamiento` a `EXITOSO` (estado financiero derivado `ANTICIPO_50_PAGADO`/`LIQUIDADO_100`) y crea `Evento`. |
+| **T-1.12** | `PAGO_EXTEMPORANEO_EN_REVISION` | `rechazar_o_expirar_72h` | Admin rechaza o `now() > revision_pago_extemporaneo.expira_en`. | `EXPIRADA_SIN_PAGO` | Libera `BloqueoAgenda`; si el Admin rechaza, registra `revision_pago_extemporaneo.resolucion = RECHAZADO`. Devuelve 100% mediante `reembolso_arrendamiento`: **tarjeta** -> `Refund` Stripe; **ficha SPEI/efectivo** -> `REEMBOLSO_BANCARIO_PENDIENTE`. |
+| **T-1.13** | `CONFIRMADO` | `acreditar_saldo_50` | `esquema == 50/50`, `now() <= D-21 23:59:59` (sin fichas en últimas 48 h). | `CONFIRMADO` | Registra `pago_arrendamiento` `EXITOSO` sobre la cuota `SALDO_50` (cuota `PAGADA`; el estado financiero pasa a `LIQUIDADO_100`) y audita el pago. |
+| **T-1.14** | `CONFIRMADO` | `reprogramar` | Nueva fecha libre; si pide cliente: `>= 21 d` y 1ra vez gratis (si queda `< 21 d` con `ANTICIPO_50_PAGADO`, exige liquidar 100% previo). | `CONFIRMADO` | Operación atómica en `AgendaService` (libera bloque previo y crea nuevo), recalcula `D-21` y `fecha_limite_publicacion`, conserva boletos, registra `reprogramacion_funcion` y marca `REPROGRAMADO` en `Función`. |
+| **T-1.15** | `CONFIRMADO` | `cancelar_arrendatario` / `incumplir_saldo_d21` | Solicitud cliente + Admin, o `50/50` sin saldo tras `D-21 23:59:59`. | `CANCELADO_POR_ARRENDATARIO` | Registra `cancelacion_arrendamiento` (`POR_ARRENDATARIO` o `INCUMPLIMIENTO_D21`) y calcula `monto_retenido` (50% si pagó 100% y `>= 21 d`; 0% reembolso si `< 21 d` o solo anticipo), detiene venta, invalida QRs, conserva historial; agenda se libera solo por acción explícita de Admin. Si llega 2do 50% tardío post `D-21`, devuelve 100% (Stripe o `REEMBOLSO_BANCARIO_PENDIENTE`). |
+| **T-1.16** | `CONFIRMADO` | `cancelar_teatro` | Admin declara cancelación por Teatro o fuerza mayor. | `CANCELADO_POR_TEATRO` | Registra `cancelacion_arrendamiento` (`POR_TEATRO`); 100% reembolso externo o reprogramación sin costo; detiene venta, invalida QRs y conserva padrón para devoluciones manuales. |
 | **T-1.17** | `CONFIRMADO` | `finalizar_arrendamiento` | Concluyen todas las fechas/funciones del evento. | `FINALIZADO` | Cierra ciclo operativo del arrendamiento. |
 
 ## **3. ME-02 — Máquina de Estados de Evento y Función**
@@ -71,21 +71,21 @@
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **T-2.1** | Evento | `[*]` | Arrendamiento `CONFIRMADO` o Evento Directo (`Comercial` / `Público`). | `PENDIENTE_PUBLICACION` | Calcula `fecha_limite_publicacion`, programa recordatorios (3 d y cada 7 d) y crea `Funciones` iniciales. |
 | **T-2.2** | Evento | `[*]` | Arrendamiento `CONFIRMADO` o Evento Directo en modalidad `Privado`. | `OPERACION_SIN_CARTELERA` | Exento de póster, tarifas y cartelera pública; mantiene bloqueo en agenda. |
-| **T-2.3** | Evento | `PENDIENTE_PUBLICACION` | Póster cargado (+ tarifas `>= $100.00 MXN` si `Comercial`) + aprobación final de `ADMIN` (`<= fecha_limite_publicacion`). | `PUBLICADO` | Visible en cartelera; si es `Comercial`, congela secciones del evento, fases de venta y tarifas y ejecuta `bulk_create(..., batch_size=1728)` de `DisponibilidadButaca` por función. |
+| **T-2.3** | Evento | `PENDIENTE_PUBLICACION` | Póster cargado (+ tarifas `>= $100.00 MXN` si `Comercial`) + aprobación final de `ADMIN` (`<= fecha_limite_publicacion`). | `PUBLICADO` | Visible en cartelera; si es `Comercial`, congela secciones del evento, fases de venta y tarifas y ejecuta `bulk_create` de `DisponibilidadButaca` por función, solo para las butacas con `asignacion_butaca`. |
 | **T-2.4** | Evento | `PENDIENTE_PUBLICACION` | `now() > fecha_limite_publicacion` sin requisitos completos (`Celery Beat`). | `VENCIDO_SIN_PUBLICAR` | Mantiene bloqueo en agenda (nunca libera automático) y exige resolución auditada del `ADMIN`. |
 | **T-2.5** | Evento | `VENCIDO_SIN_PUBLICAR` | Admin apoya capturando póster/tarifas (opción 1) o concede prórroga (opción 2) y aprueba. | `PUBLICADO` | Publica evento y materializa `DisponibilidadButaca` si es `Comercial`. |
 | **T-2.6** | Evento | `VENCIDO_SIN_PUBLICAR` | Admin autoriza operar sin venta web ni cartelera (opción 3). | `OPERACION_SIN_CARTELERA` | Conserva bloqueo en agenda para operación presencial sin venta en línea. |
 | **T-2.7** | Evento | `VENCIDO_SIN_PUBLICAR` / `PENDIENTE_PUBLICACION` / `PUBLICADO` / `OPERACION_SIN_CARTELERA` | Admin registra cancelación (opción 4, arrendatario, D-21 o Teatro). | `CANCELADO_POR_ARRENDATARIO` / `CANCELADO_POR_TEATRO` | Detiene venta, invalida QRs emitidos, conserva historial; libera agenda explícitamente (o sin retención en Directos). |
 | **T-2.8** | Evento | `PUBLICADO` / `OPERACION_SIN_CARTELERA` | Todas sus `Funciones` alcanzan `CONCLUIDA`. | `FINALIZADO` | Cierra ciclo de cartelera/operación del evento. |
-| **T-2.9** | Función | `PROGRAMADA` | Admin reprograma fecha u hora (con o sin boletos vendidos). | `REPROGRAMADO` | Operación atómica en `AgendaService`, guarda `inicio_en_anterior`/`fin_en_anterior`, conserva `Evento` en `PUBLICADO` y boletos/QRs vigentes, y notifica a cuentas registradas. |
+| **T-2.9** | Función | `PROGRAMADA` | Admin reprograma fecha u hora (con o sin boletos vendidos). | `REPROGRAMADO` | Operación atómica en `AgendaService`, registra una fila en `reprogramacion_funcion` (`inicio_anterior`/`fin_anterior` y bloqueos anterior y nuevo), conserva `Evento` en `PUBLICADO` y boletos/QRs vigentes, y notifica a cuentas registradas. |
 | **T-2.10** | Función | `PROGRAMADA` / `REPROGRAMADO` | `now() > fin_en` (o evento cancelado). | `CONCLUIDA` / `CANCELADA` | Cierra ventanas operativas de la función. |
 
 ## **4. ME-03 — Máquina de Estados de Orden de Compra (`OrdenCompra`)**
 
 ### **4.1 Reglas de Diseño**
 
-* **Un solo carrito activo por usuario y por función (`5` estados oficiales):** `OrdenCompra` maneja exclusivamente los estados `APARTADO`, `PAGO_EN_PROCESO`, `PAGADA`, `EXPIRADA` y `REEMBOLSADA_AUTOMATICA`. Al seleccionar la primera butaca disponible se crea la orden en `APARTADO` y arranca un reloj único de 10 minutos (`expira_en`; agregar más butacas dentro de `<= 10` no reinicia el reloj). En línea exige cuenta `USUARIO`; en taquilla (`CAJERO`) opera sin cuenta de comprador hasta `inicio_en` (`0 min`).
-* **Cierres independientes y pagos tardíos:** Al llegar el cierre web (`inicio_en - 30 min`), las órdenes aún en `APARTADO` no pueden iniciar `checkout` y expiran; solo continúan en gracia (`gracia_hasta = +5 min`) las ya en `PAGO_EN_PROCESO`. Si un *webhook* `payment_intent.succeeded` llega tras pasar a `EXPIRADA`, bajo el candado global `Usuario -> OrdenCompra -> DisponibilidadButaca` se verifica que la función siga vigente (`now() <= fin_en`, no cancelada), que el 100% de las butacas sigan `DISPONIBLE` y que reasignar no supere `<= 10` boletos acumulados (`APARTADO + PAGO_EN_PROCESO + PAGADA`); de lo contrario, se ejecuta reembolso automático del 100% (`REEMBOLSADA_AUTOMATICA`). Ante cancelación del evento, `OrdenCompra` permanece en `PAGADA` para respaldo contable.
+* **Un solo carrito activo por usuario (`5` estados oficiales):** `OrdenCompra` maneja exclusivamente los estados `APARTADO`, `PAGO_EN_PROCESO`, `PAGADA`, `EXPIRADA` y `REEMBOLSADA_AUTOMATICA`. Al seleccionar la primera butaca disponible se crea la orden en `APARTADO` y arranca un reloj único de 10 minutos (`expira_en`; agregar más butacas dentro de `<= 10` no reinicia el reloj). En línea exige cuenta `USUARIO`; en taquilla (`CAJERO`) opera sin cuenta de comprador hasta `inicio_en` (`0 min`).
+* **Cierres independientes y pagos tardíos:** Al llegar el cierre web (`inicio_en - 30 min`), las órdenes aún en `APARTADO` no pueden iniciar `checkout` y expiran; solo continúan en gracia (`gracia_hasta = +5 min`) las ya en `PAGO_EN_PROCESO`. Si un *webhook* `payment_intent.succeeded` llega tras pasar a `EXPIRADA`, bajo el candado global `Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> OrdenCompraDetalle -> Boleto` se verifica que la función siga vigente (`now() <= fin_en`, no cancelada), que el 100% de las butacas sigan `DISPONIBLE` y que reasignar no supere `<= 10` boletos acumulados (`APARTADO + PAGO_EN_PROCESO + PAGADA`); de lo contrario, se ejecuta reembolso automático del 100% (`REEMBOLSADA_AUTOMATICA`). Ante cancelación del evento, `OrdenCompra` permanece en `PAGADA` para respaldo contable.
 
 ### **4.2 Diagrama de Estados (PlantUML)**
 
@@ -95,13 +95,13 @@
 
 | ID | Estado Origen | Evento / Disparador | Condición Guarda | Estado Destino | Efectos Secundarios |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **T-3.1** | `[*]` | `agregar_primera_butaca` | Evento `Comercial` en `PUBLICADO`; ventana vigente (`LINEA`: `now() < inicio_en - 30m`; `TAQUILLA`: `now() < inicio_en`); butaca `DISPONIBLE`; `<= 10` boletos acumulados (`LINEA`) o por operación (`TAQUILLA`). | `APARTADO` | Bloquea `Usuario -> OrdenCompra -> DisponibilidadButaca`, fija `expira_en = now() + 10 min` y cambia butaca a `APARTADA`. Si el usuario tenía otra orden `APARTADO` en otra función, la pasa a `EXPIRADA` liberando sus butacas. |
+| **T-3.1** | `[*]` | `agregar_primera_butaca` | Evento `Comercial` en `PUBLICADO`; ventana vigente (`LINEA`: `now() < inicio_en - 30m`; `TAQUILLA`: `now() < inicio_en`); butaca `DISPONIBLE`; `<= 10` boletos acumulados (`LINEA`) o por operación (`TAQUILLA`). | `APARTADO` | Bloquea `Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> OrdenCompraDetalle -> Boleto`, fija `expira_en = now() + 10 min` y cambia butaca a `APARTADA`. Si el usuario tenía otra orden `APARTADO` en otra función, la pasa a `EXPIRADA` liberando sus butacas. |
 | **T-3.2** | `APARTADO` | `modificar_butacas` | Misma función, `now() <= expira_en`, cierre vigente y total `<= 10`. | `APARTADO` | Agrega o libera butacas sin reiniciar `expira_en`. |
 | **T-3.3** | `APARTADO` | `iniciar_checkout` | Canal `LINEA`, `now() <= expira_en`, `now() < inicio_en - 30m` y `>= 1` butaca. | `PAGO_EN_PROCESO` | Fija `gracia_hasta = expira_en + 5 min` y crea/reutiliza `PaymentIntent` en Stripe fuera del lock BD. |
 | **T-3.4** | `APARTADO` | `confirmar_cobro_taquilla` | Canal `TAQUILLA` (`CAJERO`), `now() <= expira_en`, `now() < inicio_en`, cobro `Efectivo` o `Tarjeta` externa. | `PAGADA` | Cambia butacas a `VENDIDA`, emite folios cortos y códigos QR firmados. |
 | **T-3.5** | `PAGO_EN_PROCESO` | `confirmar_pago_stripe` | Webhook `payment_intent.succeeded` con `now() <= gracia_hasta`. | `PAGADA` | Cambia butacas a `VENDIDA`, emite folios cortos + QR y encola correo PDF. |
 | **T-3.6** | `APARTADO` / `PAGO_EN_PROCESO` | `expirar_o_cancelar_orden` | `now() > limite_vigencia` (10 min o `gracia_hasta`), cierre web `-30m` sobre `APARTADO`, carrito vaciado o Cajero cancela. | `EXPIRADA` | Libera butacas a `DISPONIBLE` y cancela `PaymentIntent` en Stripe si existía. |
-| **T-3.7** | `EXPIRADA` | `webhook_tardio_valido` | `payment_intent.succeeded` tardío, `now() <= fin_en`, función no cancelada, 100% butacas `DISPONIBLE` y suma acumulada `<= 10`. | `PAGADA` | Bloquea `Usuario -> OrdenCompra -> DisponibilidadButaca`, pasa butacas a `VENDIDA`, emite boletos QR y envía correo. |
+| **T-3.7** | `EXPIRADA` | `webhook_tardio_valido` | `payment_intent.succeeded` tardío, `now() <= fin_en`, función no cancelada, 100% butacas `DISPONIBLE` y suma acumulada `<= 10`. | `PAGADA` | Bloquea `Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> OrdenCompraDetalle -> Boleto`, pasa butacas a `VENDIDA`, emite boletos QR y envía correo. |
 | **T-3.8** | `EXPIRADA` | `webhook_tardio_rechazado` | `payment_intent.succeeded` tardío y (`>= 1` butaca no `DISPONIBLE` o suma `> 10` o función cerrada/cancelada). | `REEMBOLSADA_AUTOMATICA` | Ejecuta `stripe.Refund.create()` por el 100% del monto, audita y notifica por correo. |
 
 ## **5. ME-04 — Máquina de Estados de `DisponibilidadButaca` y Boleto QR**
@@ -112,14 +112,14 @@
 
 | ID | Entidad | Estado Origen | Disparador / Guarda | Estado Destino | Efectos Secundarios |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **T-4.1** | `DisponibilidadButaca` | `[*]` | Evento `Comercial` pasa a `PUBLICADO` (o nueva función añadida). | `DISPONIBLE` | `bulk_create(..., batch_size=1728)` por cada función. |
+| **T-4.1** | `DisponibilidadButaca` | `[*]` | Evento `Comercial` pasa a `PUBLICADO` (o nueva función añadida). | `DISPONIBLE` | `bulk_create` por cada función, solo con filas de las butacas que tienen sección del evento (`asignacion_butaca`; pueden ser menos de 1,728). |
 | **T-4.2** | `DisponibilidadButaca` | `DISPONIBLE` | Selección en Web o Taquilla (`OrdenCompra` `APARTADO`). | `APARTADA` | Enlaza a `OrdenCompra` con `expira_en`. |
 | **T-4.3** | `DisponibilidadButaca` | `APARTADA` | `OrdenCompra` `EXPIRADA` o `PAGADA`. | `DISPONIBLE` / `VENDIDA` | Libera o consolida venta y emite `Boleto` en `EMITIDO`. |
-| **T-4.4** | `DisponibilidadButaca` | `DISPONIBLE` <-> `BLOQUEO_TECNICO` | `ADMIN` aplica o retira bloqueo técnico previo al cierre de taquilla. | `BLOQUEO_TECNICO` / `DISPONIBLE` | Inhabilita o restaura localidad sin emitir boleto ni QR; auditado. |
+| **T-4.4** | `DisponibilidadButaca` | `DISPONIBLE` <-> `BLOQUEO_TECNICO` | `ADMIN` aplica o retira bloqueo técnico previo al cierre de taquilla. | `BLOQUEO_TECNICO` / `DISPONIBLE` | Inhabilita o restaura localidad sin emitir boleto ni QR; registra una fila en `bloqueo_tecnico` (historial) y audita. |
 | **T-4.5** | `DisponibilidadButaca` | `DISPONIBLE` | **Exclusivo `ADMIN`** emite cortesía (`$0.00 MXN`, sin cuenta, exento `<= 10`). | `CORTESIA` | Emite `Boleto` en `EMITIDO` con QR válido y beneficiario/motivo opcional. |
 | **T-4.6** | `DisponibilidadButaca` | `CORTESIA` | `ADMIN` revoca cortesía antes del ingreso. | `DISPONIBLE` | Cambia `Boleto` asociado a `INVALIDADO` y libera localidad. |
 | **T-4.7** | `Boleto` | `EMITIDO` | Escaneo QR o folio manual válido en `[inicio_en - 2h, fin_en]`. | `USADO` | Registra `usado_en` y `validado_por` atómicamente. |
-| **T-4.8** | `Boleto` | `EMITIDO` | Reconciliación en lote (`Admin`) tras modo contingencia, o cancelación/D-21/revocación. | `USADO_CONTINGENCIA` / `INVALIDADO` | Marca ingreso en contingencia o invalida QR conservando registro. |
+| **T-4.8** | `Boleto` | `EMITIDO` | Reconciliación en lote (`Admin`) al cerrar una `contingencia_funcion` (guarda `aplicados`, `ya_usados` y `rechazados`), o cancelación/D-21/revocación. | `USADO_CONTINGENCIA` / `INVALIDADO` | Marca ingreso en contingencia (`usado_en`) o invalida QR conservando registro. |
 
 ### **5.2 Tabla de Verdad del Escáner QR en Puerta (`POST /api/v1/boletos/validar/`)**
 
@@ -141,7 +141,7 @@ Al leer un código QR (`{token}`), el sistema valida la firma `HMAC-SHA256` (`QR
 
 | Escenario de Colisión | Mecanismo en PostgreSQL / Aplicación | Comportamiento Determinista |
 | :--- | :--- | :--- |
-| **1. Compras paralelas y límite `<= 10` por usuario/función** | Jerarquía global de candados: `Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> Boleto` con `select_for_update(nowait=True)` + `UNIQUE (funcion_id, butaca_id)`. | El primer hilo adquiere el candado y aparta la butaca; cualquier colisión simultánea retorna inmediatamente `409 Conflict` sin *deadlocks* ni evasión `6 + 6 = 12`. |
+| **1. Compras paralelas y límite `<= 10` por usuario/función** | Jerarquía global de candados: `Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> OrdenCompraDetalle -> Boleto` con `select_for_update(nowait=True)` + `UNIQUE (funcion_id, butaca_id)`. | El primer hilo adquiere el candado y aparta la butaca; cualquier colisión simultánea retorna inmediatamente `409 Conflict` sin *deadlocks* ni evasión `6 + 6 = 12`. |
 | **2. Dos cotizaciones compiten por la misma fecha/turno** | `AgendaService` (`nowait=True`) + `ExclusionConstraint` (`btree_gist`) sobre `(rango_tiempo WITH &&)` donde `estado != 'LIBERADO'`. | PostgreSQL rechaza físicamente cualquier traslape concurrente, traduciendo `IntegrityError` a `409 Conflict` (o a reembolso `T-1.10` en pago tardío). |
 | **3. *Webhook* de Stripe llega al expirar el carrito** | Bloqueo pesimista siguiendo la jerarquía `Usuario -> OrdenCompra -> DisponibilidadButaca` antes de leer o cambiar estado. | Solo uno ejecuta primero: si Celery Beat (`skip_locked=True`) expiró antes, el *webhook* ejecuta `T-3.7` (reasignar) o `T-3.8` (reembolsar 100%); si el *webhook* llega antes, Celery ve `PAGADA`. |
 | **4. Reprogramación de fecha de un evento confirmado** | Transacción única (`transaction.atomic()`): `select_for_update()` sobre el `BloqueoAgenda` origen, lo cambia a **`LIBERADO` antes** de insertar el nuevo bloque (o usa `Deferrable.DEFERRED`). | Evita auto-colisión con `ExclusionConstraint`; si el nuevo rango choca con terceros, hace *rollback* automático intacto. |
@@ -149,27 +149,28 @@ Al leer un código QR (`{token}`), el sistema valida la firma `HMAC-SHA256` (`QR
 
 ### **6.2 Idempotencia en *Webhooks* de Stripe**
 
-* Todo *webhook* recibido en `/api/v1/ventas/webhooks/stripe/` valida primero la firma `Stripe-Signature` (`STRIPE_WEBHOOK_SECRET`).
-* Dentro de `transaction.atomic()`, inserta `event.id` en `stripe_webhook_events` (`stripe_event_id VARCHAR(120) PRIMARY KEY`, `estado = 'PENDIENTE'`, `modulo = metadata.modulo`) y encola la tarea asíncrona de Celery (`acks_late=True`) únicamente dentro de `transaction.on_commit()`.
+* Todo *webhook* recibido en `/api/v1/pagos/webhooks/stripe/` valida primero la firma `Stripe-Signature` (`STRIPE_WEBHOOK_SECRET`).
+* Dentro de `transaction.atomic()`, inserta `event.id` en `webhook_stripe` (`stripe_event_id TEXT PRIMARY KEY`, `estado = 'PENDIENTE'`, `modulo = metadata.modulo` con valores `VENTAS` o `COTIZACIONES`; la tabla vive en el módulo base `pagos`) y encola la tarea asíncrona de Celery (`acks_late=True`) únicamente dentro de `transaction.on_commit()`.
 * Si el `INSERT` falla por llave duplicada (`IntegrityError`), responde `HTTP 200 OK` sin reprocesar; si Redis falla antes de encolar, retorna `HTTP 500` para que Stripe reintente.
 
-#### **Estados de `Transaccion` y `PagoArrendamiento`**
+#### **Estados de `PagoOrden`, `PagoArrendamiento` y `WebhookStripe`**
 
-Además del estado de idempotencia del *webhook* (`PENDIENTE`, `PROCESADO`, `FALLIDO` en `stripe_webhook_events`), las entidades financieras derivadas de los flujos de **ME-01** y **ME-03** siguen estos estados oficiales:
+Además del estado de idempotencia del *webhook* (`webhook_stripe.estado`: `PENDIENTE`, `PROCESADO`, `FALLIDO`, en la tabla `webhook_stripe` del módulo base `pagos`), las entidades de pago siguen estos estados oficiales, tomados de `modelo-datos.md` (§4.6, §4.7 y §4.10):
 
-* **`Transaccion` (`EstadoTransaccion`, módulo `ventas`):**
-  * `PENDIENTE`: `PaymentIntent` creado (tarjeta) o ficha SPEI/efectivo emitida; aguardando confirmación de Stripe.
-  * `ACREDITADA`: Confirmada por *webhook* `payment_intent.succeeded`.
-  * `FALLIDA`: Rechazada por *webhook* `payment_intent.payment_failed` (reintentable dentro de la ventana vigente).
-  * `CANCELADA`: Cancelada explícitamente en Stripe al expirar `OrdenCompra` (`expirar_carritos_boletos`) o `PRE_RESERVADO` (`expirar_retenciones_agenda`).
-  * `REEMBOLSADA`: Reembolso técnico automático del 100% ejecutado vía Stripe API (`Refund` / `charge.refunded`) por pago tardío con tarjeta fuera de ventana o sin disponibilidad.
-* **`PagoArrendamiento` (`EstadoPagoArrendamiento`, módulo `cotizaciones`):**
-  * `PENDIENTE`: Cuota generada (`ANTICIPO_50`, `SALDO_50` o `LIQUIDACION_100`) dentro de plazo (`48 h` en `PRE_RESERVADO` o hasta `D-21 23:59:59`).
-  * `ACREDITADO`: Pago validado y aplicado a la cotización (`ANTICIPO_50_PAGADO` o `LIQUIDADO_100`).
-  * `EN_REVISION_EXTEMPORANEA`: Pago acreditado tras vencer `48 h` con fecha aún libre (`PAGO_EXTEMPORANEO_EN_REVISION`, plazo `72 h` del Admin).
-  * `VENCIDO`: Plazo expirado sin acreditación (`EXPIRADA_SIN_PAGO` o incumplimiento `D-21`).
-  * `REEMBOLSADO`: Devuelto al 100% vía Stripe API (tarjeta fuera de ventana o rechazada por Admin).
-  * `REEMBOLSO_BANCARIO_PENDIENTE`: Ficha SPEI/efectivo acreditada fuera de ventana o tras `D-21`, pendiente de devolución bancaria externa por Admin.
+* **`PagoOrden` (`pago_orden.estado`, módulo `ventas`; `metodo`: `TARJETA_STRIPE`, `EFECTIVO`, `TARJETA_TERMINAL`):**
+  * `PENDIENTE`: `PaymentIntent` creado en Stripe (tarjeta en línea) o cobro en taquilla en curso; aguarda confirmación.
+  * `EXITOSO`: Confirmado por *webhook* `payment_intent.succeeded` o por cobro en taquilla. Índice único parcial: una orden tiene a lo más un pago `EXITOSO`.
+  * `FALLIDO`: Rechazado por *webhook* `payment_intent.payment_failed` (reintentable dentro de la ventana vigente).
+  * `CANCELADO`: Cancelado explícitamente en Stripe al expirar la `OrdenCompra` (`expirar_carritos_boletos`).
+  * La devolución automática por pago tardío **no** es un estado de `pago_orden`: se registra en `reembolso_orden` (`estado`: `PENDIENTE`, `EXITOSO`, `FALLIDO`; `motivo`: `BUTACAS_OCUPADAS`, `LIMITE_EXCEDIDO` o `FUNCION_CONCLUIDA_O_CANCELADA`) y la orden pasa a `REEMBOLSADA_AUTOMATICA` (ME-03, T-3.8).
+* **`PagoArrendamiento` (`pago_arrendamiento.estado`, módulo `cotizaciones`; `metodo`: `TARJETA`, `FICHA_SPEI`, `FICHA_EFECTIVO`):**
+  * `PENDIENTE`: Intento creado para una cuota (`cuota_arrendamiento.tipo`: `ANTICIPO_50`, `SALDO_50` o `TOTAL_100`) dentro de plazo (`48 h` en `PRE_RESERVADO` o hasta `D-21 23:59:59`).
+  * `EXITOSO`: Pago validado y aplicado a la cuota, que pasa a `PAGADA`. El estado financiero `ANTICIPO_50_PAGADO` o `LIQUIDADO_100` se calcula, no se guarda.
+  * `EXTEMPORANEO`: Pago acreditado tras vencer `48 h` con fecha aún libre (`PAGO_EXTEMPORANEO_EN_REVISION`, plazo `72 h` del Admin en `revision_pago_extemporaneo`).
+  * `FALLIDO`: Rechazado por Stripe; puede reintentarse con otro intento dentro de plazo.
+  * `CANCELADO`: Intento cancelado al vencer la retención o al cancelar la cotización.
+  * Las devoluciones se registran en `reembolso_arrendamiento` (`tipo`: `AUTOMATICO_TARJETA` o `BANCARIO_EXTERNO`; `estado`: `PENDIENTE`, `COMPLETADO`, `FALLIDO`). El estado financiero `REEMBOLSO_BANCARIO_PENDIENTE` (ficha SPEI/efectivo acreditada fuera de ventana o tras `D-21`) se calcula a partir de un `reembolso_arrendamiento` `BANCARIO_EXTERNO` en `PENDIENTE`.
+* **`cuota_arrendamiento.estado`** (cuota de la cotización): `PENDIENTE`, `PAGADA`, `VENCIDA`.
 
 ### **6.3 Catálogo de Tareas Periódicas (Celery Beat)**
 
@@ -178,12 +179,12 @@ Todas las tareas consultan columnas `TIMESTAMPTZ` persistidas en BD bajo `Americ
 | Tarea Programada | Frecuencia | Consulta / Condición de Disparo | Acción Ejecutada |
 | :--- | :--- | :--- | :--- |
 | `expirar_carritos_boletos` | Cada 30 seg | Órdenes en `APARTADO` con `now() > expira_en` o en `PAGO_EN_PROCESO` con `now() > gracia_hasta`. | Pasa orden a `EXPIRADA`, libera butacas y cancela `PaymentIntent` en Stripe. |
-| `expirar_retenciones_agenda` | Cada 5 min | Cotizaciones en `PROPUESTA_RETENIDA` o `PRE_RESERVADO` (`now() > pre_reserva_expira_en` / `propuesta_expira_en`). | Pasa a `PROPUESTA_EXPIRADA` o `EXPIRADA_SIN_PAGO` y libera `BloqueoAgenda`. |
-| `expirar_revision_extemporanea` | Cada 15 min | Cotizaciones en `PAGO_EXTEMPORANEO_EN_REVISION` con `now() > revision_extemporanea_expira_en` (72 h). | Libera `BloqueoAgenda` y dispara devolución 100% (Stripe `Refund` o `REEMBOLSO_BANCARIO_PENDIENTE`). |
+| `expirar_retenciones_agenda` | Cada 5 min | Cotizaciones en `PROPUESTA_RETENIDA` o `PRE_RESERVADO` (`now() > bloqueo_agenda.expira_en`; en propuestas, `propuesta_fecha.expira_en`). | Pasa a `PROPUESTA_EXPIRADA` o `EXPIRADA_SIN_PAGO` y libera `BloqueoAgenda`. |
+| `expirar_revision_extemporanea` | Cada 15 min | Cotizaciones en `PAGO_EXTEMPORANEO_EN_REVISION` con `now() > revision_pago_extemporaneo.expira_en` (72 h). | Libera `BloqueoAgenda` y dispara devolución 100% (Stripe `Refund` o `REEMBOLSO_BANCARIO_PENDIENTE`). |
 | `verificar_limite_publicacion` | Cada 1 hora | Eventos en `PENDIENTE_PUBLICACION` con `now() > fecha_limite_publicacion`. | Transiciona evento a `VENCIDO_SIN_PUBLICAR` (sin liberar agenda) y genera alerta al Admin. |
 | `enviar_recordatorios_requisitos` | Diario 09:00 | Eventos en `PENDIENTE_PUBLICACION` con `now() >= proximo_recordatorio_en` (3 d y cada 7 d). | Encola correo de recordatorio y actualiza `proximo_recordatorio_en` (alerta al Admin en día 3). |
 | `verificar_incumplimiento_saldo` | Diario 00:05 | Cotizaciones `CONFIRMADO` (`50/50`) sin liquidar donde pasó `D-21 23:59:59`. | Cancela arrendamiento/evento (`CANCELADO_POR_ARRENDATARIO`), detiene venta, invalida QRs y alerta al Admin (sin liberar agenda automáticamente si hay boletos). |
-| `actualizar_sla_cotizaciones` | Cada 1 hora | Cotizaciones `EN_REVISION` con `> 5 días hábiles` (L–V `America/Mexico_City`) o fecha estimada vencida. | Marca `atrasada = True` o transiciona a `EXPIRADA_POR_FECHA`. |
+| `actualizar_sla_cotizaciones` | Cada 1 hora | Cotizaciones `EN_REVISION` con `> 5 días hábiles` (L–V `America/Mexico_City`) o fecha estimada vencida. | Notifica el atraso (calculado con `enviada_en`; no se guarda) o transiciona a `EXPIRADA_POR_FECHA`. |
 
 ## **7. Guía de Implementación (*Domain Services*)**
 
@@ -237,6 +238,27 @@ class OrdenCompraService:
 
         # Llamada HTTP externa a Stripe fuera de select_for_update()
         client_secret, payment_intent_id = pago_gateway.crear_o_reutilizar_intent(orden)
-        OrdenCompra.objects.filter(pk=orden.pk).update(payment_intent_id=payment_intent_id)
+        # Persistir payment_intent_id en pago_orden.stripe_payment_intent_id (PagoOrden), no en orden_compra.
         return orden, client_secret
 ```
+
+## **Registro de cambios (2026-11-26)**
+
+| Tema | Antes | Ahora |
+| :--- | :--- | :--- |
+| Modelo de pagos | `Transaccion` (`EstadoTransaccion`), `stripe_webhook_events` | `PagoOrden` (`pago_orden`: `PENDIENTE`, `EXITOSO`, `FALLIDO`, `CANCELADO`), `ReembolsoOrden` y `WebhookStripe` (`webhook_stripe`); `PagoArrendamiento` con `EXITOSO`/`EXTEMPORANEO` |
+| Endpoint del webhook | `/api/v1/ventas/webhooks/stripe/` | `/api/v1/pagos/webhooks/stripe/` |
+| Estado financiero de la cotización | Atributo `estado_liquidacion` | Calculado a partir de `cuota_arrendamiento` y `reembolso_arrendamiento`; no se guarda |
+| Atraso SLA | Bandera `atrasada = True` | Calculado con `enviada_en` y días hábiles; no se guarda |
+| Aprobación de cotización (T-1.6) | Sin versión del monto oficial; `pre_reserva_expira_en` | Requiere `cotizacion_version` vigente; fija `cotizacion_parametros.version_aprobada_id` y `asistentes_acordados`; expiración en `bloqueo_agenda.expira_en` |
+| Propuestas de fecha (T-1.1) | Sin registro del motivo | `propuesta_fecha` con `motivo` y `opcion_propuesta` |
+| Expiraciones de cotización | `pre_reserva_expira_en`, `propuesta_expira_en`, `revision_extemporanea_expira_en` | `bloqueo_agenda.expira_en`, `propuesta_fecha.expira_en`, `revision_pago_extemporaneo.expira_en` |
+| Cuota de cierre | `LIQUIDACION_100` | `TOTAL_100` (tipo de `cuota_arrendamiento`) |
+| Inventario por función (T-2.3, T-4.1) | `bulk_create(..., batch_size=1728)` | `bulk_create` solo para butacas con `asignacion_butaca` (pueden ser menos de 1,728) |
+| Reprogramación de función (T-2.9) | `inicio_en_anterior` / `fin_en_anterior` en la función | Fila en `reprogramacion_funcion` (`inicio_anterior`, `fin_anterior`, bloqueos anterior y nuevo) |
+| Bloqueo técnico (T-4.4) | Sin historial | Fila en `bloqueo_tecnico` |
+| Contingencia (T-4.8, ME-04) | Modo contingencia (bandera) | Registro `contingencia_funcion` cerrado por reconciliación (`aplicados`, `ya_usados`, `rechazados`) |
+| Candado de orden (4.1, T-3.1, T-3.7, 6.1) | `Usuario -> OrdenCompra -> DisponibilidadButaca -> Boleto` | `Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> OrdenCompraDetalle -> Boleto` |
+| Carrito activo (4.1) | Un carrito activo por usuario y por función | Un carrito activo por usuario (índice parcial en `orden_compra`) |
+| Persistencia del `PaymentIntent` (§7) | `orden_compra.payment_intent_id` | `pago_orden.stripe_payment_intent_id` |
+| Módulos | "módulos transversales" | "módulos base" (`usuarios`, `configuracion`, `recinto`, `agenda`, `auditoria`, `pagos`) |

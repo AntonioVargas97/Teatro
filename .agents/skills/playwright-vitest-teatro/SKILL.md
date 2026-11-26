@@ -10,6 +10,7 @@ Follow these testing, mocking, concurrency, and CI conventions across `backend/`
 ## 1. Backend Testing (`backend/apps/<modulo>/tests/`)
 
 - **Official test runner:** Always use **`django.test.TestCase`** and **`django.test.TransactionTestCase`** via `python manage.py test`. Never install or use `pytest` or `pytest-django`.
+- **Database:** tests always run on PostgreSQL, never on SQLite. `ExclusionConstraint`, `TSTZRANGE`, composite FKs and partial indexes need it.
 - **Execution in Docker:**
   ```powershell
   docker compose exec -T backend python manage.py test
@@ -19,16 +20,19 @@ Follow these testing, mocking, concurrency, and CI conventions across `backend/`
 
 ### Unit & Integration Tests (`TestCase`)
 - Test business transitions in `services.py` (`<= 6` sub-sections, `>= $100.00 MXN`, single-function `OrdenCompra`, `30m`/`0m` closes blocking `APARTADO -> checkout`, `50/50` vs `100%` at `>30d`/`D-21` and reschedule recalc, Mon-Fri SLA, midnight-crossing functions, `bulk_create` of `1,728` rows on `PUBLICADO`, `$0.00` courtesies, PDF/CSV exports and batch contingency reconciliation, cancellations including `CANCELADO_POR_ARRENDATARIO` with sold tickets, late-payment auto-refunds vs `REEMBOLSO_BANCARIO_PENDIENTE`).
+- **Schema and integrity tests:** query `pg_constraint` and fail if any of the 14 composite FKs is missing. Walk every model and fail if a foreign key is not `on_delete=PROTECT`. Check that no foreign key points from a lower layer to a higher one (cross-layer FK check), and run the `layers` contract of `import-linter`.
+- **Publication gate and sale phases:** an event cannot be published until every enabled section is fully assigned and every pair of sale phase and event section has a price. With simulated time, the sale phase in force is the one with the greatest `inicia_en <= now()`, and each `OrdenCompraDetalle` keeps the phase and price in force when the seat was held, even after the phase changes.
 - Test RBAC and anti-IDOR rules in `permissions.py` across all 4 roles (`ADMIN`, `CAJERO`, `VERIFICADOR`, `USUARIO`) and anonymous `Visitante` (`401`/`403` verification on cross-user resources).
 - **Stripe & time mocking:** Mock `PaymentGateway` / `StripeAdapter` with `unittest.mock` in unit tests so tests run offline. Test webhook idempotency by replaying the same `stripe_event_id` and verifying `200 OK` without duplicate tickets or refunds. Simulate time progression by patching `django.utils.timezone.now` or using explicit DB `TIMESTAMPTZ` timestamps (do not add external time-mocking dependencies).
 
 ### Concurrency Tests (`TransactionTestCase`)
 - Always use **`TransactionTestCase`** (never `TestCase`, which wraps each test in an uncommitted outer transaction and masks real row locks across threads).
-- Verify pessimistic row locks (`Usuario -> OrdenCompra -> DisponibilidadButaca -> Boleto` with `select_for_update(nowait=True)`) and `ExclusionConstraint` (`btree_gist`) under multi-threaded `threading.Thread` / `ThreadPoolExecutor` contention:
+- Verify pessimistic row locks (`Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> OrdenCompraDetalle -> Boleto` with `select_for_update(nowait=True)`) and `ExclusionConstraint` (`btree_gist`) under multi-threaded `threading.Thread` / `ThreadPoolExecutor` contention:
   - Concurrent seat holds on the same seat: exactly 1 succeeds, others get `409 Conflict` (`0%` overselling).
   - Parallel-tab `<= 10` limit check (`6 + 6 = 12` simultaneous apartados for the same `USUARIO` + `Funcion` fails second with `409 Conflict`, and late-webhook reassignment re-verifies `<= 10`).
   - Concurrent QR gate scans on the same ticket (`of=('self',)` only on `Boleto`): exactly 1 gets `200 OK`, others get `409 Conflict`.
   - Concurrent agenda reservations on overlapping intervals: `ExclusionConstraint` rejects overlap (`409 Conflict`).
+  - Lock order: two checkouts that share several seats acquire them in `(funcion_id, butaca_id)` order and neither deadlocks. A seat can have only one active `OrdenCompraDetalle` (`activo`).
 - Call `connections.close_all()` inside worker threads so PostgreSQL connections clean up properly between runs.
 
 ## 2. Frontend Unit & Component Tests (`frontend/src/features/**/__tests__/`)
@@ -60,5 +64,5 @@ Follow these testing, mocking, concurrency, and CI conventions across `backend/`
 ## 4. CI Pipeline Checks (`.github/workflows/pruebas.yml`)
 
 Every pull request/push must pass:
-- **Backend:** `ruff check .`, `lint-imports` (strict unidirectional `apps/agenda/` dependency), and `python manage.py test`.
+- **Backend:** `ruff check .`, `lint-imports` (`layers` contract over the base and domain apps, plus the cross-layer FK check), and `python manage.py test`.
 - **Frontend:** `tsc --noEmit`, `eslint .`, `prettier --check .`, and `vitest run`.

@@ -1,4 +1,5 @@
 @startuml ME03_Orden_Compra
+' Actualizado 2026-11-26: alineado con BD v6.2. Estados financieros derivados (no columnas), PagoOrden/PagoArrendamiento, webhook_stripe, contingencia_funcion por tabla, cotizacion_version al aprobar, asignacion_butaca para el inventario.
 hide empty description
 skinparam state {
   BackgroundColor #F8FAFC
@@ -11,13 +12,13 @@ skinparam state {
 APARTADO --> APARTADO : Agrega/quita butaca misma función\n[<= 10 boletos, sin reiniciar expira_en]
 APARTADO --> EXPIRADA : Vence expira_en, cierre web (-30m),\nusuario vacía/cambia función o Cajero cancela\n/ libera butacas a DISPONIBLE
 APARTADO --> PAGO_EN_PROCESO : Canal LINEA inicia checkout Stripe\n[now() <= expira_en y cierre web -30m vigente]\n/ gracia_hasta = expira_en + 5m
-APARTADO --> PAGADA : Canal TAQUILLA confirma cobro presencial\n[Efectivo o Tarjeta externa; now() < inicio_en]\n/ butacas VENDIDA + emite boletos QR
+APARTADO --> PAGADA : Canal TAQUILLA confirma cobro presencial\n[pago_orden EFECTIVO o TARJETA_TERMINAL; now() < inicio_en]\n/ butacas VENDIDA + emite boletos QR
 
 PAGO_EN_PROCESO --> PAGADA : Webhook Stripe OK [<= gracia_hasta]\n/ butacas VENDIDA + emite boletos QR
 PAGO_EN_PROCESO --> EXPIRADA : Vence gracia_hasta sin confirmación\n/ cancela PaymentIntent y libera butacas
 
 EXPIRADA --> PAGADA : Webhook Stripe tardío OK\n[now() <= fin_en, función no cancelada,\n100% butacas DISPONIBLE y <= 10 acumulados]\n/ reasigna atómicamente y emite boletos QR
-EXPIRADA --> REEMBOLSADA_AUTOMATICA : Webhook Stripe tardío OK\n[>= 1 butaca ocupada, > 10 acumulados\no función cerrada/cancelada]\n/ refund 100% Stripe + correo
+EXPIRADA --> REEMBOLSADA_AUTOMATICA : Webhook Stripe tardío OK\n[>= 1 butaca ocupada, > 10 acumulados\no función cerrada/cancelada]\n/ reembolso_orden + refund 100% Stripe + correo
 
 note right of PAGADA
   Si el evento se cancela posteriormente,

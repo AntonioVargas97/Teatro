@@ -1,4 +1,5 @@
 @startuml ME04_Butaca_QR
+' Actualizado 2026-11-26: alineado con BD v6.2. Estados financieros derivados (no columnas), PagoOrden/PagoArrendamiento, webhook_stripe, contingencia_funcion por tabla, cotizacion_version al aprobar, asignacion_butaca para el inventario.
 hide empty description
 skinparam state {
   BackgroundColor #F8FAFC
@@ -7,12 +8,12 @@ skinparam state {
 }
 
 state "Inventario de DisponibilidadButaca (por Función Comercial)" as But {
-  [*] --> DISPONIBLE : Evento pasa a PUBLICADO\n[bulk_create 1,728 por función]
+  [*] --> DISPONIBLE : Evento pasa a PUBLICADO\n[bulk_create por función; solo butacas con asignacion_butaca]
   DISPONIBLE --> APARTADA : Selección en Web o Taquilla\n[OrdenCompra APARTADO 10 min]
   APARTADA --> DISPONIBLE : OrdenCompra EXPIRADA\no cancelación/cierre en Taquilla
   APARTADA --> VENDIDA : OrdenCompra PAGADA
 
-  DISPONIBLE --> BLOQUEO_TECNICO : Admin inhabilita asiento\n[sin boleto ni QR]
+  DISPONIBLE --> BLOQUEO_TECNICO : Admin inhabilita asiento\n[sin boleto ni QR; fila en bloqueo_tecnico]
   BLOQUEO_TECNICO --> DISPONIBLE : Admin retira bloqueo
 
   DISPONIBLE --> CORTESIA : Admin emite cortesía\n[exclusivo ADMIN; $0.00, sin cuenta, exento <= 10]
@@ -22,9 +23,9 @@ state "Inventario de DisponibilidadButaca (por Función Comercial)" as But {
 --
 
 state "Ciclo de Vida del BOLETO QR" as QR {
-  [*] --> EMITIDO : OrdenCompra PAGADA o CORTESIA emitida
+  [*] --> EMITIDO : OrdenCompraDetalle con pago PAGADA o CORTESIA emitida
   EMITIDO --> USADO : Escaneo válido en puerta\n[inicio_en - 2h <= now() <= fin_en]
-  EMITIDO --> USADO_CONTINGENCIA : Reconciliación en lote\ntras Modo Contingencia [Admin]
+  EMITIDO --> USADO_CONTINGENCIA : Reconciliación en lote\ntras cerrar contingencia_funcion [Admin]
   EMITIDO --> INVALIDADO : Cancelación evento / incumplimiento D-21\n/ revocación cortesía
 }
 @enduml

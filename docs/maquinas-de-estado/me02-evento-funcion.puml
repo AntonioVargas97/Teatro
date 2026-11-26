@@ -1,4 +1,5 @@
 @startuml ME02_Evento_Funcion
+' Actualizado 2026-11-26: alineado con BD v6.2. Estados financieros derivados (no columnas), PagoOrden/PagoArrendamiento, webhook_stripe, contingencia_funcion por tabla, cotizacion_version al aprobar, asignacion_butaca para el inventario.
 hide empty description
 skinparam state {
   BackgroundColor #F8FAFC
@@ -32,9 +33,9 @@ state "Ciclo de Vida del EVENTO" as Ev {
 --
 
 state "Ciclo Administrativo por FUNCIÓN" as Fn {
-  [*] --> PROGRAMADA : Función creada dentro de BloqueoAgenda\n[con fecha, hora_inicio, hora_fin, inicio_en, fin_en UTC]
+  [*] --> PROGRAMADA : Función creada dentro de BloqueoAgenda\n[inicio_en, fin_en en UTC; hora local derivada]
 
-  PROGRAMADA --> REPROGRAMADO : Admin reprograma fecha/horario\n[operación atómica en AgendaService;\nEvento permanece PUBLICADO y QRs vigentes]
+  PROGRAMADA --> REPROGRAMADO : Admin reprograma fecha/horario\n[operación atómica en AgendaService;\nregistra reprogramacion_funcion; Evento permanece PUBLICADO y QRs vigentes]
   PROGRAMADA --> CANCELADA : Evento cancelado
   REPROGRAMADO --> CANCELADA : Evento cancelado
   PROGRAMADA --> CONCLUIDA : now() > fin_en
@@ -46,7 +47,7 @@ state "Ciclo Administrativo por FUNCIÓN" as Fn {
     * Venta web: now() < inicio_en - 30 min
     * Taquilla física: now() < inicio_en - 0 min
     * Acceso QR en puerta: inicio_en - 2h <= now() <= fin_en
-    * Modo contingencia: bandera modo_contingencia_activo (<= 24h antes)
+    * Modo contingencia: tabla contingencia_funcion (una abierta por función; <= 24h antes)
   end note
 }
 @enduml

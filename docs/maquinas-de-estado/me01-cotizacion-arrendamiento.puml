@@ -1,4 +1,5 @@
 @startuml ME01_Cotizacion_Arrendamiento
+' Actualizado 2026-11-26: alineado con BD v6.2. Estados financieros derivados (no columnas), PagoOrden/PagoArrendamiento, webhook_stripe, contingencia_funcion por tabla, cotizacion_version al aprobar, asignacion_butaca para el inventario.
 hide empty description
 skinparam state {
   BackgroundColor #F8FAFC
@@ -11,34 +12,34 @@ skinparam state {
 note right of EN_REVISION
   SLA atención: 3 días hábiles (L-V).
   Si > 5 días hábiles sin respuesta,
-  bandera atrasada = True (no es sub-estado).
+  atraso calculado con enviada_en (no es sub-estado).
 end note
 
 EN_REVISION --> EXPIRADA_POR_FECHA : Pasó fecha estimada\nsin resolución [Celery Beat]
 EN_REVISION --> RECHAZADA : Admin rechaza solicitud
 EN_REVISION --> PROPUESTA_RETENIDA : Admin propone 1..3 fechas\n[retiene BloqueoAgenda 48h]
-EN_REVISION --> PRE_RESERVADO : Admin aprueba monto oficial\n[snapshot: > 30d -> 50/50, <= 30d -> 100%\n| bloquea BloqueoAgenda 48h]
+EN_REVISION --> PRE_RESERVADO : Admin aprueba una cotizacion_version vigente\n[version_aprobada_id; snapshot: > 30d -> 50/50, <= 30d -> 100%\n| bloquea BloqueoAgenda 48h]
 
 PROPUESTA_RETENIDA --> PROPUESTA_EXPIRADA : Vencen 48h o\nsolicitante rechaza\n/ libera BloqueoAgenda
 PROPUESTA_RETENIDA --> EN_REVISION : Solicitante acepta 1 fecha\n/ libera opciones no elegidas,\nmantiene elegida retenida
 
-PRE_RESERVADO --> CONFIRMADO : Pago inicial acreditado <= 48h\n[ANTICIPO_50_PAGADO o LIQUIDADO_100]
+PRE_RESERVADO --> CONFIRMADO : Pago inicial acreditado <= 48h\n[pago_arrendamiento EXITOSO; estado financiero\nANTICIPO_50_PAGADO o LIQUIDADO_100 derivado]
 PRE_RESERVADO --> EXPIRADA_SIN_PAGO : Vencen 48h sin pago\n/ libera BloqueoAgenda
 
 EXPIRADA_SIN_PAGO --> PAGO_EXTEMPORANEO_EN_REVISION : Webhook Stripe tardío\n[fecha aún libre | plazo 72h Admin]
-EXPIRADA_SIN_PAGO --> EXPIRADA_SIN_PAGO : Webhook Stripe tardío [fecha ocupada]\n/ tarjeta: Refund 100% Stripe;\nficha SPEI/efectivo: REEMBOLSO_BANCARIO_PENDIENTE
+EXPIRADA_SIN_PAGO --> EXPIRADA_SIN_PAGO : Webhook Stripe tardío [fecha ocupada]\n/ tarjeta: Refund 100% Stripe;\nficha SPEI/efectivo: reembolso BANCARIO_EXTERNO (REEMBOLSO_BANCARIO_PENDIENTE)
 
 PAGO_EXTEMPORANEO_EN_REVISION --> CONFIRMADO : Admin acepta <= 72h\n/ consolida BloqueoAgenda
-PAGO_EXTEMPORANEO_EN_REVISION --> EXPIRADA_SIN_PAGO : Admin rechaza o vencen 72h\n/ tarjeta: Refund 100% Stripe;\nficha SPEI/efectivo: REEMBOLSO_BANCARIO_PENDIENTE
+PAGO_EXTEMPORANEO_EN_REVISION --> EXPIRADA_SIN_PAGO : Admin rechaza o vencen 72h\n/ tarjeta: Refund 100% Stripe;\nficha SPEI/efectivo: reembolso BANCARIO_EXTERNO (REEMBOLSO_BANCARIO_PENDIENTE)
 
-CONFIRMADO --> CONFIRMADO : Saldo 50% <= D-21 23:59:59\n[sin fichas en últimas 48h]\n-> LIQUIDADO_100
+CONFIRMADO --> CONFIRMADO : Saldo 50% <= D-21 23:59:59\n[sin fichas en últimas 48h]\n-> cuota SALDO_50 PAGADA (LIQUIDADO_100 derivado)
 CONFIRMADO --> CONFIRMADO : Reprogramar [>= 21d (1ra vez) o Teatro]\n[si < 21d liquidar 100% previo]\n/ actualiza BloqueoAgenda y D-21
 
 CONFIRMADO --> CANCELADO_POR_ARRENDATARIO : Solicitud cliente + Admin\no incumple saldo D-21\n/ detiene venta y QRs si hay boletos;\nliberación explícita de agenda por Admin
 CONFIRMADO --> CANCELADO_POR_TEATRO : Fuerza mayor / Teatro\n/ 100% ext. o reprogramación;\ndetiene venta y QRs
 CONFIRMADO --> FINALIZADO : Concluyen todas las fechas\ndel arrendamiento
 
-CANCELADO_POR_ARRENDATARIO --> CANCELADO_POR_ARRENDATARIO : Saldo 50% tardío post D-21\n/ tarjeta: Refund 100% Stripe;\nficha SPEI/efectivo: REEMBOLSO_BANCARIO_PENDIENTE
+CANCELADO_POR_ARRENDATARIO --> CANCELADO_POR_ARRENDATARIO : Saldo 50% tardío post D-21\n/ tarjeta: Refund 100% Stripe;\nficha SPEI/efectivo: reembolso BANCARIO_EXTERNO (REEMBOLSO_BANCARIO_PENDIENTE)
 
 EXPIRADA_POR_FECHA --> [*]
 RECHAZADA --> [*]
