@@ -18,3 +18,5 @@ Este repositorio usa skills complementarias bajo `.agents/skills/`. Cuando dos g
 
 6. **Diagramas UML (`plantuml-diagrama-clases`):**
    - Todo diagrama de clases en PlantUML vive en `docs/diagramas-uml/` y sigue UML 2.5.1 con relaciones sin cruces, verificado con `scripts/check_crossings.py`. Se construye solo con lo definido en las fuentes de verdad (`docs/arquitectura.md`, `docs/alcance.md`, `docs/maquinas-de-estado.md`).
+   - Diagramas de robustez (`plantuml-diagrama-robustez`): `docs/diagramas-uml/diagramas-de-robustez/RBNN_*.puml`, reglas ICONIX sustantivo–verbo verificadas con `scripts/check_robustness.py`.
+   - Diagramas de secuencia (`plantuml-diagrama-secuencia`): `docs/diagramas-uml/diagramas-de-secuencia/SDNN_*.puml`, UML 2.5.1 con lifelines del diagrama de robustez del mismo `NN`, verificados con `scripts/check_sequence.py`. Orden de trabajo: casos de uso → robustez → secuencia.
