@@ -1,0 +1,42 @@
+@startuml 04_arrendamiento_usuario
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Usuario estándar" as U
+
+rectangle "Cotización y seguimiento de arrendamiento" {
+  usecase "Solicitar cotización de\narrendamiento" as UC1
+  usecase "Capturar datos del\nevento y fechas" as UC2
+  usecase "Consultar estado de la\nsolicitud" as UC3
+  usecase "Consultar propuestas de\nfechas alternativas" as UC4
+  usecase "Aceptar fecha alternativa" as UC5
+  usecase "Rechazar fecha\nalternativa" as UC6
+  usecase "Realizar pago de\narrendamiento" as UC7
+  usecase "Pagar con tarjeta en línea" as UC8
+  usecase "Solicitar cancelación de\narrendamiento" as UC9
+  usecase "Solicitar reprogramación\nde arrendamiento" as UC10
+}
+
+U --> UC1
+U --> UC3
+U --> UC4
+U --> UC7
+U --> UC9
+U --> UC10
+UC1 ..> UC2 : <<include>>
+UC4 <.. UC5 : <<extend>>
+UC4 <.. UC6 : <<extend>>
+UC7 <.. UC8 : <<extend>>
+@enduml

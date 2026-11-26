@@ -1,0 +1,45 @@
+@startuml 06_eventos_tarifas_y_publicacion
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Administrador" as A
+actor "Usuario estándar" as U
+
+rectangle "Gestión de eventos, tarifas y publicación" {
+  usecase "Registrar evento directo" as UC1
+  usecase "Resolver evento\npendiente de publicación" as UC2
+  usecase "Administrar funciones del\nevento" as UC3
+  usecase "Cargar / actualizar póster\npublicitario" as UC4
+  usecase "Publicar evento" as UC5
+  usecase "Configurar secciones,\nsubsecciones y tarifas" as UC6
+  usecase "Emitir cortesías" as UC7
+  usecase "Bloquear localidad por\nmotivos técnicos" as UC8
+  usecase "Reprogramar evento" as UC9
+  usecase "Cancelar evento" as UC10
+}
+
+A --> UC1
+A --> UC2
+A --> UC3
+A --> UC4
+A --> UC5
+A --> UC6
+A --> UC7
+A --> UC8
+A --> UC9
+A --> UC10
+U --> UC4
+U --> UC6
+@enduml

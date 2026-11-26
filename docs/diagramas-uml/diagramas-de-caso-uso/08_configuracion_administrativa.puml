@@ -1,0 +1,32 @@
+@startuml 08_configuracion_administrativa
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Administrador" as A
+
+rectangle "Configuración administrativa" {
+  usecase "Administrar tarifas base y\nhorarios de arrendamiento" as UC1
+  usecase "Administrar catálogo de\nservicios extra e\ninfraestructura" as UC2
+  usecase "Configurar parámetros de\ncompra y taquilla" as UC3
+  usecase "Configurar políticas de\ncancelación y\nreprogramación" as UC4
+  usecase "Configurar parámetros de\ncotizaciones y agenda" as UC5
+}
+
+A --> UC1
+A --> UC2
+A --> UC3
+A --> UC4
+A --> UC5
+@enduml

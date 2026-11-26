@@ -1,0 +1,42 @@
+@startuml 01_portal_publico_y_cuentas
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Visitante" as V
+actor "Usuario estándar" as U
+
+rectangle "Portal público y gestión de cuentas" {
+  usecase "Registrarse" as UC1
+  usecase "Iniciar sesión" as UC2
+  usecase "Recuperar contraseña\npor correo" as UC3
+  usecase "Consultar cartelera" as UC4
+  usecase "Filtrar cartelera por fecha\ny categoría" as UC5
+  usecase "Consultar información de\nun evento" as UC6
+  usecase "Consultar mapa de\ndisponibilidad de asientos" as UC7
+  usecase "Gestionar perfil personal" as UC8
+}
+
+V --> UC1
+V --> UC4
+V --> UC6
+V --> UC7
+U --> UC2
+U --> UC3
+U --> UC4
+U --> UC6
+U --> UC7
+U --> UC8
+UC4 <.. UC5 : <<extend>>
+@enduml

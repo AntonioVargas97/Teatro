@@ -1,0 +1,40 @@
+@startuml 03_taquilla_fisica
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Cajero" as C
+actor "Administrador" as A
+
+rectangle "Taquilla física" {
+  usecase "Vender boletos en\ntaquilla" as UC1
+  usecase "Consultar funciones\ndisponibles" as UC2
+  usecase "Consultar mapa de\nasientos" as UC3
+  usecase "Seleccionar y apartar\nlocalidades" as UC4
+  usecase "Registrar método de\npago" as UC5
+  usecase "Emitir e imprimir boletos" as UC6
+  usecase "Cancelar operación de\ntaquilla" as UC7
+  usecase "Reimprimir boletos\nmediante número de\norden" as UC8
+}
+
+C --> UC1
+C --> UC8
+A --> UC8
+UC1 ..> UC2 : <<include>>
+UC1 ..> UC3 : <<include>>
+UC1 ..> UC4 : <<include>>
+UC1 ..> UC5 : <<include>>
+UC1 ..> UC6 : <<include>>
+UC1 <.. UC7 : <<extend>>
+@enduml

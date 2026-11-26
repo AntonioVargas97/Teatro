@@ -1,0 +1,36 @@
+@startuml 02_venta_boletos_en_linea
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Usuario estándar" as U
+
+rectangle "Venta de boletos en línea" {
+  usecase "Comprar boletos en línea" as UC1
+  usecase "Seleccionar función" as UC2
+  usecase "Consultar mapa\ninteractivo de asientos" as UC3
+  usecase "Seleccionar y apartar\nlocalidades" as UC4
+  usecase "Procesar pago con tarjeta" as UC5
+  usecase "Consultar mis órdenes y\nboletos" as UC6
+  usecase "Descargar boletos" as UC7
+}
+
+U --> UC1
+U --> UC6
+UC1 ..> UC2 : <<include>>
+UC1 ..> UC3 : <<include>>
+UC1 ..> UC4 : <<include>>
+UC1 ..> UC5 : <<include>>
+UC6 <.. UC7 : <<extend>>
+@enduml

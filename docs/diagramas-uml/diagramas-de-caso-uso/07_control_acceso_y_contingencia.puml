@@ -1,0 +1,35 @@
+@startuml 07_control_acceso_y_contingencia
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Verificador" as V
+actor "Administrador" as A
+
+rectangle "Control de acceso y contingencia" {
+  usecase "Validar boleto para\nacceso" as UC1
+  usecase "Validar boleto mediante\nfolio corto" as UC2
+  usecase "Activar modo\ncontingencia" as UC3
+  usecase "Exportar listado de\ncontrol de folios" as UC4
+  usecase "Registrar reconciliación\nde folios en lote" as UC5
+}
+
+V --> UC1
+V --> UC2
+A --> UC1
+A --> UC2
+A --> UC3
+A --> UC4
+A --> UC5
+@enduml

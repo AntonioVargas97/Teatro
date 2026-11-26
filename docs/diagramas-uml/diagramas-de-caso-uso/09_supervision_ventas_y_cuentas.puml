@@ -1,0 +1,26 @@
+@startuml 09_supervision_ventas_y_cuentas
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Administrador" as A
+
+rectangle "Supervisión de ventas y cuentas internas" {
+  usecase "Consultar ventas globales y\ncancelaciones auditadas" as UC1
+  usecase "Administrar cuentas internas" as UC2
+}
+
+A --> UC1
+A --> UC2
+@enduml

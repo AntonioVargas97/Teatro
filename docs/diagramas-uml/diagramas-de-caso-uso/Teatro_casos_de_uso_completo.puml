@@ -1,0 +1,336 @@
+@startuml 01_portal_publico_y_cuentas
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Visitante" as V
+actor "Usuario estándar" as U
+
+rectangle "Portal público y gestión de cuentas" {
+  usecase "Registrarse" as UC1
+  usecase "Iniciar sesión" as UC2
+  usecase "Recuperar contraseña\npor correo" as UC3
+  usecase "Consultar cartelera" as UC4
+  usecase "Filtrar cartelera por fecha\ny categoría" as UC5
+  usecase "Consultar información de\nun evento" as UC6
+  usecase "Consultar mapa de\ndisponibilidad de asientos" as UC7
+  usecase "Gestionar perfil personal" as UC8
+}
+
+V --> UC1
+V --> UC4
+V --> UC6
+V --> UC7
+U --> UC2
+U --> UC3
+U --> UC4
+U --> UC6
+U --> UC7
+U --> UC8
+UC4 <.. UC5 : <<extend>>
+@enduml
+@startuml 02_venta_boletos_en_linea
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Usuario estándar" as U
+
+rectangle "Venta de boletos en línea" {
+  usecase "Comprar boletos en línea" as UC1
+  usecase "Seleccionar función" as UC2
+  usecase "Consultar mapa\ninteractivo de asientos" as UC3
+  usecase "Seleccionar y apartar\nlocalidades" as UC4
+  usecase "Procesar pago con tarjeta" as UC5
+  usecase "Consultar mis órdenes y\nboletos" as UC6
+  usecase "Descargar boletos" as UC7
+}
+
+U --> UC1
+U --> UC6
+UC1 ..> UC2 : <<include>>
+UC1 ..> UC3 : <<include>>
+UC1 ..> UC4 : <<include>>
+UC1 ..> UC5 : <<include>>
+UC6 <.. UC7 : <<extend>>
+@enduml
+@startuml 03_taquilla_fisica
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Cajero" as C
+actor "Administrador" as A
+
+rectangle "Taquilla física" {
+  usecase "Vender boletos en\ntaquilla" as UC1
+  usecase "Consultar funciones\ndisponibles" as UC2
+  usecase "Consultar mapa de\nasientos" as UC3
+  usecase "Seleccionar y apartar\nlocalidades" as UC4
+  usecase "Registrar método de\npago" as UC5
+  usecase "Emitir e imprimir boletos" as UC6
+  usecase "Cancelar operación de\ntaquilla" as UC7
+  usecase "Reimprimir boletos\nmediante número de\norden" as UC8
+}
+
+C --> UC1
+C --> UC8
+A --> UC8
+UC1 ..> UC2 : <<include>>
+UC1 ..> UC3 : <<include>>
+UC1 ..> UC4 : <<include>>
+UC1 ..> UC5 : <<include>>
+UC1 ..> UC6 : <<include>>
+UC1 <.. UC7 : <<extend>>
+@enduml
+@startuml 04_arrendamiento_usuario
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Usuario estándar" as U
+
+rectangle "Cotización y seguimiento de arrendamiento" {
+  usecase "Solicitar cotización de\narrendamiento" as UC1
+  usecase "Capturar datos del\nevento y fechas" as UC2
+  usecase "Consultar estado de la\nsolicitud" as UC3
+  usecase "Consultar propuestas de\nfechas alternativas" as UC4
+  usecase "Aceptar fecha alternativa" as UC5
+  usecase "Rechazar fecha\nalternativa" as UC6
+  usecase "Realizar pago de\narrendamiento" as UC7
+  usecase "Pagar con tarjeta en línea" as UC8
+  usecase "Solicitar cancelación de\narrendamiento" as UC9
+  usecase "Solicitar reprogramación\nde arrendamiento" as UC10
+}
+
+U --> UC1
+U --> UC3
+U --> UC4
+U --> UC7
+U --> UC9
+U --> UC10
+UC1 ..> UC2 : <<include>>
+UC4 <.. UC5 : <<extend>>
+UC4 <.. UC6 : <<extend>>
+UC7 <.. UC8 : <<extend>>
+@enduml
+@startuml 05_arrendamiento_administrador
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Administrador" as A
+
+rectangle "Cotización y seguimiento de arrendamiento" {
+  usecase "Consultar calendario de\ndisponibilidad" as UC1
+  usecase "Registrar bloqueos de\nagenda" as UC2
+  usecase "Revisar solicitudes de\ncotización" as UC3
+  usecase "Aprobar cotización" as UC4
+  usecase "Rechazar solicitud de\ncotización" as UC5
+  usecase "Proponer fechas\nalternativas" as UC6
+  usecase "Realizar pago de\narrendamiento" as UC7
+  usecase "Resolver pago\nextemporáneo" as UC8
+}
+
+A --> UC1
+A --> UC2
+A --> UC3
+A --> UC7
+A --> UC8
+UC3 <.. UC4 : <<extend>>
+UC3 <.. UC5 : <<extend>>
+UC3 <.. UC6 : <<extend>>
+@enduml
+@startuml 06_eventos_tarifas_y_publicacion
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Administrador" as A
+actor "Usuario estándar" as U
+
+rectangle "Gestión de eventos, tarifas y publicación" {
+  usecase "Registrar evento directo" as UC1
+  usecase "Resolver evento\npendiente de publicación" as UC2
+  usecase "Administrar funciones del\nevento" as UC3
+  usecase "Cargar / actualizar póster\npublicitario" as UC4
+  usecase "Publicar evento" as UC5
+  usecase "Configurar secciones,\nsubsecciones y tarifas" as UC6
+  usecase "Emitir cortesías" as UC7
+  usecase "Bloquear localidad por\nmotivos técnicos" as UC8
+  usecase "Reprogramar evento" as UC9
+  usecase "Cancelar evento" as UC10
+}
+
+A --> UC1
+A --> UC2
+A --> UC3
+A --> UC4
+A --> UC5
+A --> UC6
+A --> UC7
+A --> UC8
+A --> UC9
+A --> UC10
+U --> UC4
+U --> UC6
+@enduml
+@startuml 07_control_acceso_y_contingencia
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Verificador" as V
+actor "Administrador" as A
+
+rectangle "Control de acceso y contingencia" {
+  usecase "Validar boleto para\nacceso" as UC1
+  usecase "Validar boleto mediante\nfolio corto" as UC2
+  usecase "Activar modo\ncontingencia" as UC3
+  usecase "Exportar listado de\ncontrol de folios" as UC4
+  usecase "Registrar reconciliación\nde folios en lote" as UC5
+}
+
+V --> UC1
+V --> UC2
+A --> UC1
+A --> UC2
+A --> UC3
+A --> UC4
+A --> UC5
+@enduml
+@startuml 08_configuracion_administrativa
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Administrador" as A
+
+rectangle "Configuración administrativa" {
+  usecase "Administrar tarifas base y\nhorarios de arrendamiento" as UC1
+  usecase "Administrar catálogo de\nservicios extra e\ninfraestructura" as UC2
+  usecase "Configurar parámetros de\ncompra y taquilla" as UC3
+  usecase "Configurar políticas de\ncancelación y\nreprogramación" as UC4
+  usecase "Configurar parámetros de\ncotizaciones y agenda" as UC5
+}
+
+A --> UC1
+A --> UC2
+A --> UC3
+A --> UC4
+A --> UC5
+@enduml
+@startuml 09_supervision_ventas_y_cuentas
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Administrador" as A
+
+rectangle "Supervisión de ventas y cuentas internas" {
+  usecase "Consultar ventas globales y\ncancelaciones auditadas" as UC1
+  usecase "Administrar cuentas internas" as UC2
+}
+
+A --> UC1
+A --> UC2
+@enduml
