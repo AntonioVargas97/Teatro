@@ -71,7 +71,7 @@
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **T-2.1** | Evento | `[*]` | Arrendamiento `CONFIRMADO` o Evento Directo (`Comercial` / `Público`). | `PENDIENTE_PUBLICACION` | Calcula `fecha_limite_publicacion`, programa recordatorios (3 d y cada 7 d) y crea `Funciones` iniciales. |
 | **T-2.2** | Evento | `[*]` | Arrendamiento `CONFIRMADO` o Evento Directo en modalidad `Privado`. | `OPERACION_SIN_CARTELERA` | Exento de póster, tarifas y cartelera pública; mantiene bloqueo en agenda. |
-| **T-2.3** | Evento | `PENDIENTE_PUBLICACION` | Póster cargado (+ tarifas `>= $100.00 MXN` si `Comercial`) + aprobación final de `ADMIN` (`<= fecha_limite_publicacion`). | `PUBLICADO` | Visible en cartelera; si es `Comercial`, congela sub-secciones/tarifas y ejecuta `bulk_create(..., batch_size=1728)` de `DisponibilidadButaca` por función. |
+| **T-2.3** | Evento | `PENDIENTE_PUBLICACION` | Póster cargado (+ tarifas `>= $100.00 MXN` si `Comercial`) + aprobación final de `ADMIN` (`<= fecha_limite_publicacion`). | `PUBLICADO` | Visible en cartelera; si es `Comercial`, congela secciones del evento, fases de venta y tarifas y ejecuta `bulk_create(..., batch_size=1728)` de `DisponibilidadButaca` por función. |
 | **T-2.4** | Evento | `PENDIENTE_PUBLICACION` | `now() > fecha_limite_publicacion` sin requisitos completos (`Celery Beat`). | `VENCIDO_SIN_PUBLICAR` | Mantiene bloqueo en agenda (nunca libera automático) y exige resolución auditada del `ADMIN`. |
 | **T-2.5** | Evento | `VENCIDO_SIN_PUBLICAR` | Admin apoya capturando póster/tarifas (opción 1) o concede prórroga (opción 2) y aprueba. | `PUBLICADO` | Publica evento y materializa `DisponibilidadButaca` si es `Comercial`. |
 | **T-2.6** | Evento | `VENCIDO_SIN_PUBLICAR` | Admin autoriza operar sin venta web ni cartelera (opción 3). | `OPERACION_SIN_CARTELERA` | Conserva bloqueo en agenda para operación presencial sin venta en línea. |
@@ -133,7 +133,7 @@ Al leer un código QR (`{token}`), el sistema valida la firma `HMAC-SHA256` (`QR
 | **4** | Respaldo manual o contexto con `funcion_id` activa distinta al boleto | `409` | Sin cambio | `"Boleto de la función DD/MM HH:MM"` | No |
 | **5** | `now() < funcion.inicio_en - 2 horas` | `422` | Sin cambio | `"Abre a las HH:MM"` | No |
 | **6** | `now() > funcion.fin_en` | `422` | Sin cambio | `"La función ya terminó"` | No |
-| **7** | `boleto.estado == EMITIDO` y `now()` en `[inicio_en - 2h, fin_en]` | `200` | **`USADO`** | `"Acceso permitido"` + Sub-sección, Fila y Asiento | **Sí** (atómico) |
+| **7** | `boleto.estado == EMITIDO` y `now()` en `[inicio_en - 2h, fin_en]` | `200` | **`USADO`** | `"Acceso permitido"` + Sección, Fila y Asiento | **Sí** (atómico) |
 
 ## **6. Protocolo de Concurrencia, Idempotencia y Tareas Asíncronas**
 

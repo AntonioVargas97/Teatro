@@ -31,7 +31,7 @@ Plataforma de boletaje y cotización de arrendamiento del Teatro de la Ciudad de
 | `agenda` (transversal) | `sala`, `bloqueo_agenda` | BloqueoAgenda (y el recurso que se reserva) |
 | `auditoria` (transversal) | `registro_auditoria` | RegistroAuditoria |
 | `cartelera` | `categoria`, `evento`, `bloque_evento_directo`, `funcion`, `reprogramacion_funcion`, `resolucion_vencimiento` | Evento y Función |
-| `inventario` | `seccion`, `palco`, `butaca`, `seccion_evento`, `asignacion_butaca`, `fase_venta`, `precio_seccion`, `disponibilidad_butaca`, `bloqueo_tecnico` | Sección y Butaca, SubseccionTarifaria (ahora `seccion_evento` + precios por fase), DisponibilidadButaca |
+| `inventario` | `seccion`, `palco`, `butaca`, `seccion_evento`, `asignacion_butaca`, `fase_venta`, `precio_seccion`, `disponibilidad_butaca`, `bloqueo_tecnico` | Sección y Butaca, SeccionEvento, FaseVenta, PrecioSeccion, DisponibilidadButaca |
 | `ventas` | `orden_compra`, `orden_compra_detalle`, `pago_orden`, `reembolso_orden`, `webhook_stripe` | OrdenCompra, Transacción / Stripe |
 | `boletos` | `boleto`, `cortesia`, `contingencia_funcion` | Boleto |
 | `cotizaciones` | `cotizacion`, `cotizacion_parametros`, `bloque_solicitado`, `cotizacion_servicio`, `propuesta_fecha`, `opcion_propuesta`, `cuota_arrendamiento`, `pago_arrendamiento`, `ficha_pago`, `reembolso_arrendamiento`, `revision_pago_extemporaneo`, `cancelacion_arrendamiento` | Cotización, Pago de Arrendamiento |
