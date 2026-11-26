@@ -15,7 +15,7 @@ Este archivo define las reglas siempre activas para todo el repositorio y coordi
 
 Consulta y aplica la guía correspondiente según el área de trabajo (ver detalle en `.agents/skills/AGENT.md`):
 
-* **Dominio y reglas de negocio:** `teatro-reglas-negocio` (plazos `> 30d` / `D-21`, `48h`, `72h`, `<= 10` boletos, geometría `<= 6` sub-secciones, `>= $100.00 MXN`, exclusiones).
+* **Dominio y reglas de negocio:** `teatro-reglas-negocio` (plazos `> 30d` / `D-21`, `48h`, `72h`, `<= 10` boletos, secciones del evento: conservación, sección única, agrupación o subdivisión `<= 6`, fases de venta consecutivas, `>= $100.00 MXN`, exclusiones).
 * **Backend (`backend/`):** `django-teatro-backend` (API REST `/api/v1/` sin Django Admin, `services.py`, orden de candados `Usuario -> OrdenCompra -> DisponibilidadButaca -> Boleto`, `nowait=True`/`skip_locked=True`, `import-linter`, `StripeAdapter`).
 * **Frontend (`frontend/`):** `react-teatro-frontend` (SPAs `/` y `/gestion/`, cookies `HttpOnly` + CSRF, *polling* del mapa `1,728` butacas, `Stripe Elements`, escáner QR) y `frontend-design` (**solo estética visual**, sin alterar textos legales/QR obligatorios ni legibilidad operativa desde `360px`).
 * **Pruebas y CI (`.github/workflows/pruebas.yml`):** `playwright-vitest-teatro` (`TestCase`, `TransactionTestCase` para concurrencia, `ruff`, `import-linter`, `tsc --noEmit`, `ESLint + Prettier`, `Vitest`, `Playwright`).

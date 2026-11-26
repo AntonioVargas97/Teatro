@@ -26,7 +26,7 @@ Nunca cambies estos identificadores, conteos ni colores estructurales en el plan
 ### Reglas de Zoom e Interacción del Plano SVG (`viewBox="0 0 1100 940"`)
 - **Umbral LOD semántico (`ZOOM_SEAT_THRESHOLD = 1.7`):** por debajo de `1.7x` se muestran las 6 macro-secciones sólidas con su nombre, aforo y rango tarifario; al llegar a `>= 1.7x` las macro-formas bajan a `fill-opacity="0.16"` y aparecen las **1,728 butacas individuales**. Escala máxima `4.5x`.
 - **4 modos de operación soportados por el componente del plano:** `public`, `taquilla`, `admin-sala` y `configurator`.
-- **Configurador de sub-secciones (`configurador.html`):** cada sección puede dividirse hasta en `6` sub-secciones contiguas con piso `>= $100.00 MXN`, cobertura `100%` sin butacas huérfanas y nombre compuesto `{Sección} - {Sub-sección}`. Al publicar el evento, la configuración se congela.
+- **Configurador tarifario (`configurador.html`):** configuración de secciones del evento (conservación 6 secciones, sección única, agrupación o subdivisión de hasta ≤ 6 por sección oficial) y fases de venta consecutivas, con piso `>= $100.00 MXN`, cobertura `100%` sin butacas huérfanas y nombre único por evento. Al publicar el evento, la configuración se congela.
 
 ---
 
@@ -36,7 +36,7 @@ Para cumplir accesibilidad y no depender solo del color, cada estado combina rel
 
 | Estado de Butaca | Relleno | Trazo / Estilo | Texto / Marca SVG | Comportamiento según modo |
 | :--- | :--- | :--- | :--- | :--- |
-| **DISPONIBLE** | `#FFFFFF` | Color de sub-sección (`1.5px`) o `#0284C7` si es accesible | Número en `#0F172A` | Seleccionable |
+| **DISPONIBLE** | `#FFFFFF` | Color de sección del evento (`1.5px`) o `#0284C7` si es accesible | Número en `#0F172A` | Seleccionable |
 | **SELECCIONADA** | `#E58E26` | `#0F172A` (`2px`) | Número `#FFFFFF` + marca `✓` (`#0F172A`) | Deseleccionable |
 | **APARTADA (otro carrito)** | `#FEF3C7` | `#B45309` (`stroke-dasharray="2 1.5"`) | Número `#92400E` + marca `⏳` | Bloqueada (`not-allowed`) |
 | **VENDIDA** | `#CBD5E1` | `#94A3B8` | Línea diagonal `#64748B` (`seat-cross`) | Bloqueada (`not-allowed`) |

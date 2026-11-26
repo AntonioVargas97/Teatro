@@ -51,11 +51,11 @@ apps/<modulo>/
 - **Never mutate `estado` directly in views, serializers, Celery tasks, or webhooks.** Encapsulate every transition in explicit `services.py` methods wrapped in `@transaction.atomic`.
 - **Audit trail:** Log sensitive operations (box office sales, quote approvals/rejections/reschedules/cancellations, `VENCIDO_SIN_PUBLICAR` & late-payment resolutions, technical blocks, courtesies, auto-refunds, contingency exports/reconciliation, config changes, staff accounts) via `AuditoriaService`.
 - **Soft delete only:** Never physically delete confirmed `OrdenCompra`, `Pago`, `Boleto`, `Cotizacion`, or `BloqueoAgenda` records; transition status instead.
-- **Snapshots:** Config changes (`ConfiguracionSistema`, turn rates, extras/infrastructure in `apps/configuracion/`) and published event tariffs/sub-sections must be snapshotted so existing quotes, orders, and tickets are never retroactively altered.
+- **Snapshots:** Config changes (`ConfiguracionSistema`, turn rates, extras/infrastructure in `apps/configuracion/`) and published event sections, sale phases, and prices (`SeccionEvento`, `FaseVenta`, `PrecioSeccion`) must be snapshotted so existing quotes, orders, and tickets are never retroactively altered.
 
 ## 4. Concurrency, Database & Timezones (ADR-02, ADR-05, ADR-08)
 
-- **Django ORM migrations are the single source of truth** (`database/*.sql` is reference-only). Seed official 1,728 seats, catalogs, and demo data via `seed_teatro`, `seed_catalogos`, and `seed_demo`.
+- **Django ORM migrations are the single source of truth** (`database/*.sql` is reference-only). Seed official 1,728 seats (single room in initial delivery: `Sala` "Teatro de la Ciudad", architected for multi-room expansion), catalogs, and demo data via `seed_teatro`, `seed_catalogos`, and `seed_demo`.
 - **Global lock hierarchy & pessimistic locking:**
   - Always acquire row locks in strict order **`Usuario` -> `OrdenCompra` -> `DisponibilidadButaca` ordered by `(funcion_id, butaca_id) ASC` -> `Boleto`** (locking only the minimum required scope).
   - Seat reservation / checkout (`OrdenCompra` / `DisponibilidadButaca`): use `select_for_update(nowait=True)` in HTTP requests (`409 Conflict` on contention) and `select_for_update(skip_locked=True)` in Celery Beat cleanup tasks.
@@ -64,7 +64,7 @@ apps/<modulo>/
   - Agenda overlap: rely on `AgendaService` (`nowait=True`) + PostgreSQL `ExclusionConstraint` (`btree_gist`) on half-open `[inicio, fin)` ranges where `estado != 'LIBERADO'`.
 - **Naming conventions:** Use Spanish `snake_case` timestamps (`usado_en`, `expira_en`, `gracia_hasta`, `validado_por`, `proximo_recordatorio_en`) and uppercase seat states (`DISPONIBLE`, `APARTADA`, `VENDIDA`, `BLOQUEO_TECNICO`, `CORTESIA`).
 - **Timezones & function lifecycle:** Persist `TIMESTAMPTZ` in **UTC** (`inicio_en`, `fin_en` on `Funcion`, advancing `fin_en` +1 day when `hora_fin <= hora_inicio`); evaluate all business deadlines (`30m` web close / `0m` box office blocking `APARTADO -> checkout`, `10m + 5m` cart, `48h` pre-reserve/alternatives, `72h` late payment, `D-21 23:59:59`, `min(inicio_primer_bloque, max(primera_fecha - 15d, fecha_pago + 3d))`, Mon-Fri business-day SLA, `[inicio_en - 2h, fin_en]` QR window) deterministically in **`America/Mexico_City`** using `zoneinfo` + `tzdata`. Never call external time APIs. Materialize the `1,728` `DisponibilidadButaca` rows via `bulk_create(..., batch_size=1728)` when the Commercial event transitions to `PUBLICADO` (creating initial `Funciones` when lease payment hits `CONFIRMADO`). Recalculate `D-21`/`D-15` on reschedule (requiring `100%` payment first if `< 21d`).
-- **Money:** Use `Decimal(10, 2)` (`MXN`, net final prices without extra VAT), never `float`. Enforce commercial floor `>= $100.00 MXN` per sub-section; in `50/50` (`> 30d`, `D-21` cutoff + `9d` margin), round advance with `ROUND_HALF_UP` and compute `saldo = total - anticipo`.
+- **Money:** Use `Decimal(10, 2)` (`MXN`, net final prices without extra VAT), never `float`. Enforce commercial floor `>= $100.00 MXN` per event section and sale phase combination (`PrecioSeccion`); in `50/50` (`> 30d`, `D-21` cutoff + `9d` margin), round advance with `ROUND_HALF_UP` and compute `saldo = total - anticipo`.
 
 ## 5. Stripe, Celery & Document Generation
 

@@ -9,22 +9,26 @@ Todas las reglas temporales, cierres y días naturales se evalúan bajo **`Ameri
 
 ## 1. Aforo, Modalidades y Origen de Eventos
 
-- **Recinto:** **1,728 butacas** fijas en **6 secciones oficiales** (`Luneta`, `Platea`, `Mezzanine`, `Primer Piso`, `Segundo Piso`, `Palcos`), incluyendo asientos accesibles (silla de ruedas y acompañante).
+- **Recinto:** Sala única en primera entrega ("Teatro de la Ciudad", con modelo de datos preparado para multi-sala), con **1,728 butacas** fijas en **6 secciones oficiales** (`Luneta`, `Platea`, `Mezzanine`, `Primer Piso`, `Segundo Piso`, `Palcos`), incluyendo asientos accesibles (silla de ruedas y acompañante).
 - **Modalidades:**
   - **Comercial:** cartelera pública, póster obligatorio, configuración tarifaria, aprobación final de `ADMIN` y boletaje completo (mapa 1,728, venta web/taquilla, QR).
   - **Público:** cartelera pública informativa, póster obligatorio y aprobación final de `ADMIN`, bloquea agenda, **sin boletaje ni QR** (el organizador controla acceso físico hasta 1,728 personas).
   - **Privado:** oculto en cartelera pública, sin póster ni boletaje, nace directo en `OPERACION_SIN_CARTELERA` y bloquea agenda.
 - **Categorías fijas de cartelera (sembradas en `seed_catalogos`):** `Teatro`, `Música`, `Danza`, `Infantil y Familiar`, `Comedia / Stand-up`, `Conferencia / Institucional`, `Festival / Otros`.
 - **Orígenes:** `ARRENDAMIENTO` (cotización + pago de `USUARIO`) o `DIRECTO` (alta por `ADMIN` sin cotización ni renta; respeta mismas reglas de agenda, póster y tarifas).
-- **Relación Evento → Funciones:** Al confirmar pago inicial se crean el `Evento` y las `Funciones` iniciales de bloques de función (excluyendo bloques exclusivos de montaje/ensayos); al pasar un evento Comercial a `PUBLICADO` se ejecutan los `bulk_create` de 1,728 `DisponibilidadButaca` por función. Soporta funciones nocturnas que cruzan medianoche (`fin_en` al día siguiente). Al rentar más de 1 día o más de 1 función el mismo día, los bloques de montaje/ensayo van incluidos en el precio (solo reservan agenda sin habilitar venta ni costo extra de turno).
+- **Relación Evento → Funciones:** Al confirmar pago inicial se crean el `Evento` y las `Funciones` iniciales de bloques de función (excluyendo bloques exclusivos de montaje/ensayos); al pasar un evento Comercial a `PUBLICADO` se ejecutan los `bulk_create` de 1,728 `DisponibilidadButaca` por función compartiendo póster, secciones del evento, fases de venta y tarifas congeladas. Soporta funciones nocturnas que cruzan medianoche (`fin_en` al día siguiente). Al rentar más de 1 día o más de 1 función el mismo día, los bloques de montaje/ensayo van incluidos en el precio (solo reservan agenda sin habilitar venta ni costo extra de turno).
 
-## 2. Sub-secciones, Tarifas, Bloqueos y Cortesías (Comercial)
+## 2. Secciones del Evento, Fases de Venta, Tarifas, Bloqueos y Cortesías (Comercial)
 
-- **Configurador tarifario:** conservar 6 secciones (1 clic), deshabilitar secciones completas o subdividir en **`<= 6` sub-secciones por sección oficial**:
-  - Graderías: bloques rectangulares `(fila_inicio, fila_fin, col_inicio, col_fin)`.
-  - `Palcos`: listas de cabinas completas `palco_ids` (prohibido partir una cabina).
-- **Nomenclatura y unicidad:** etiqueta por defecto `{Sección} - Zona {N}`, editable antes de publicar. Unicidad compuesta **`{Sección} - {Nombre}`** (ej. `Luneta - VIP` y `Palcos - VIP` son válidos; repetir nombre en la misma sección oficial o dejarlo vacío es inválido).
-- **Piso mínimo y congelamiento:** cada sub-sección habilitada exige **`>= $100.00 MXN`** (precios finales netos en MXN sin IVA adicional), cubriendo el 100% de las butacas de las secciones habilitadas. Sub-secciones, nombres y tarifas se **congelan al publicar**.
+- **Configurador tarifario (2 dimensiones independientes):**
+  - **Secciones del evento (zonas de precio):** Cada butaca habilitada pertenece exactamente a una sección del evento. Cuatro modalidades:
+    1. *Conservación estándar (1 clic, por defecto):* 6 secciones oficiales (`Luneta`, `Platea`, `Mezzanine`, `Primer Piso`, `Segundo Piso`, `Palcos`), con opción de deshabilitar secciones completas.
+    2. *Sección única:* Todo el aforo habilitado en una sola sección comercial (ej. `"General"`).
+    3. *Agrupación de secciones oficiales completas:* Unir dos o más secciones oficiales completas en una sola sección comercial con nombre libre (ej. `"Palmeras"`).
+    4. *Subdivisión estructurada de una sección oficial:* Dividir una sección oficial en hasta `<= 6` secciones del evento contiguas (en graderías mediante bloques rectangulares `(fila_inicio, fila_fin, col_inicio, col_fin)`; en `Palcos` únicamente agrupando cabinas completas sin partir cabinas).
+  - **Nomenclatura y unicidad:** Nombres sugeridos por defecto (`{Sección}` en conservación o `{Sección} - Zona {N}` al subdividir) o personalizados. El nombre no puede quedar vacío ni repetirse dentro del mismo evento.
+  - **Fases de venta (variación por fecha de compra):** El periodo de venta se divide en una o más fases consecutivas (ej. `"Preventa"`, `"Venta general"`), cada una con nombre y fecha/hora de inicio; cada fase dura hasta que inicia la siguiente y la última hasta el cierre. Todo evento comercial tiene al menos una fase. La fase aplica a todas las funciones del evento y se determina por el momento en que el comprador aparta sus butacas.
+  - **Matriz de precios y congelamiento:** Cada combinación de sección del evento y fase de venta tiene un precio oficial **`>= $100.00 MXN`** (precios finales netos en MXN sin IVA adicional), cubriendo el 100% de las butacas de las secciones habilitadas. Secciones del evento, nombres, fases de venta (incluyendo fecha de inicio) y precios se **congelan al publicar**.
 - **Acciones post-publicación de `ADMIN` (solo sobre `DISPONIBLE` antes del cierre de taquilla):**
   - **Bloqueo técnico:** inhabilita butaca sin emitir boleto ni QR; reversible.
   - **Cortesía:** `$0.00 MXN` (método `Cortesía`), **sí emite boleto con QR válido**, **exenta del límite de 10 boletos**, no requiere cuenta del invitado y permite registrar beneficiario/motivo opcional.
@@ -51,7 +55,7 @@ Todas las reglas temporales, cierres y días naturales se evalúan bajo **`Ameri
 - **Webhook tardío en boletos (`EXPIRADA`):** bajo bloqueo global (`Usuario -> OrdenCompra -> DisponibilidadButaca`), si el 100% de las butacas siguen `DISPONIBLE` y reasignar no supera `<= 10` boletos acumulados, reasigna y emite boletos (`PAGADA`); en caso contrario ejecuta **reembolso técnico automático del 100%** (`REEMBOLSADA_AUTOMATICA`).
 - **Cierre independiente por función (`-30m` web / `0m` taquilla):** Al llegar el cierre, las `OrdenCompra` aún en `APARTADO` **no** pueden iniciar `checkout` y expiran; solo continúan en gracia (+5 min) las órdenes ya en `PAGO_EN_PROCESO` antes del cierre.
 - **Taquilla física (`CAJERO`):** sin cuenta de comprador; comparte inventario de 1,728 y apartado de 10 min; pago `Efectivo` o `Tarjeta` (terminal externa); límite **`<= 10` boletos por operación**; cierre **`0 min` antes** (`hora_inicio`).
-- **Validación QR (`VERIFICADOR`):** **100% online**, uso único, evalúa la ventana de la función embebida en el token **`[inicio_en - 2h, fin_en]`** (soportando cruce de medianoche). Mensajes exactos: `"Acceso permitido"` (+ sub-sección, fila, asiento), `"Abre a las HH:MM"`, `"La función ya terminó"`, `"Boleto de la función DD/MM HH:MM"`, `"Ya ingresó a las HH:MM"`, `"Boleto no válido"`. Respaldo manual por folio corto; reingreso físico con sello/brazalete.
+- **Validación QR (`VERIFICADOR`):** **100% online**, uso único, evalúa la ventana de la función embebida en el token **`[inicio_en - 2h, fin_en]`** (soportando cruce de medianoche). Mensajes exactos: `"Acceso permitido"` (+ sección, fila, asiento), `"Abre a las HH:MM"`, `"La función ya terminó"`, `"Boleto de la función DD/MM HH:MM"`, `"Ya ingresó a las HH:MM"`, `"Boleto no válido"`. Respaldo manual por folio corto; reingreso físico con sello/brazalete.
 - **Modo contingencia:** exportación PDF/CSV (`folio_corto, seccion_subseccion, fila, asiento`) auditada desde **`24 h` antes** de la función + activación explícita (`modo_contingencia_activo`) + reconciliación en lote vía CSV (`folio_corto`) o lista pegada en `ADMIN`.
 
 ## 5. Cancelaciones y Reprogramaciones
