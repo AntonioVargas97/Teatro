@@ -5,9 +5,10 @@ Este archivo define las reglas siempre activas para todo el repositorio y coordi
 ## 1. Fuentes de Verdad (Máxima Prioridad)
 
 1. `docs/alcance.md` — Reglas de negocio, plazos, límites, roles y exclusiones de alcance.
-2. `docs/arquitectura.md` — Capas, módulos transversales (`agenda`, `configuracion`, `auditoria`), concurrencia, RBAC y ADRs.
-3. `docs/stack-tecnologico.md` — Versiones aprobadas y librerías explícitamente excluidas.
-4. `docs/maquinas-de-estado.md` y `docs/maquinas-de-estado/*.puml` — Estados, guardas y transiciones oficiales.
+2. `docs/arquitectura.md` — Capas, módulos base (`usuarios`, `configuracion`, `recinto`, `agenda`, `auditoria`, `pagos`), concurrencia, RBAC y ADRs.
+3. `docs/modelo-datos.md` (v6.2) — Modelo relacional: 44 tablas, columnas, claves, restricciones y estados.
+4. `docs/stack-tecnologico.md` — Versiones aprobadas y librerías explícitamente excluidas.
+5. `docs/maquinas-de-estado.md` y `docs/maquinas-de-estado/*.puml` — Estados, guardas y transiciones oficiales.
 
 * **Sincronización obligatoria:** Ninguna implementación, prueba o diagrama puede contradecir estas fuentes. Si cambia una regla de negocio o arquitectura, deben actualizarse primero (o en el mismo cambio) las fuentes de verdad y las *skills* impactadas.
 
@@ -16,7 +17,7 @@ Este archivo define las reglas siempre activas para todo el repositorio y coordi
 Consulta y aplica la guía correspondiente según el área de trabajo (ver detalle en `.agents/skills/AGENT.md`):
 
 * **Dominio y reglas de negocio:** `teatro-reglas-negocio` (plazos `> 30d` / `D-21`, `48h`, `72h`, `<= 10` boletos, secciones del evento: conservación, sección única, agrupación o subdivisión `<= 6`, fases de venta consecutivas, `>= $100.00 MXN`, exclusiones).
-* **Backend (`backend/`):** `django-teatro-backend` (API REST `/api/v1/` sin Django Admin, `services.py`, orden de candados `Usuario -> OrdenCompra -> DisponibilidadButaca -> Boleto`, `nowait=True`/`skip_locked=True`, `import-linter`, `StripeAdapter`).
+* **Backend (`backend/`):** `django-teatro-backend` (API REST `/api/v1/` sin Django Admin, `services.py`, orden de candados `Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> OrdenCompraDetalle -> Boleto`, `nowait=True`/`skip_locked=True`, `import-linter`, `StripeAdapter`).
 * **Frontend (`frontend/`):** `react-teatro-frontend` (SPAs `/` y `/gestion/`, cookies `HttpOnly` + CSRF, *polling* del mapa `1,728` butacas, `Stripe Elements`, escáner QR) y `frontend-design` (**solo estética visual**, sin alterar textos legales/QR obligatorios ni legibilidad operativa desde `360px`).
 * **Pruebas y CI (`.github/workflows/pruebas.yml`):** `playwright-vitest-teatro` (`TestCase`, `TransactionTestCase` para concurrencia, `ruff`, `import-linter`, `tsc --noEmit`, `ESLint + Prettier`, `Vitest`, `Playwright`).
 * **Seguridad:** `security-audit` como guía continua (RBAC, anti-IDOR/BOLA, firmas Stripe y QR); ejecutar auditoría completa solo cuando se solicite explícitamente.
