@@ -123,12 +123,12 @@
 
 ### **5.2 Tabla de Verdad del Escáner QR en Puerta (`POST /api/v1/boletos/validar/`)**
 
-Al leer un código QR (`{token}`), el sistema valida la firma `HMAC-SHA256` (`QR_HMAC_SECRET`) y resuelve el `funcion_id` embebido en el token. Únicamente el respaldo manual por `{folio_corto, funcion_id}` (restringido a `VERIFICADOR` / `ADMIN`) recibe explícitamente la `funcion_id` activa en pantalla. La evaluación sigue este orden estricto:
+Al leer un código QR (`{token}`), el sistema valida la firma `HMAC-SHA256` (`QR_HMAC_SECRET`) y resuelve el `funcion_id` embebido en el token. Si el Verificador o Admin seleccionó una función en la pantalla de cámara, adjunta `funcion_id` al token para comprobar la correspondencia. En el respaldo manual, `{folio_corto, funcion_id}` son obligatorios. En ambos casos la ventana horaria se evalúa sobre la función del boleto. La evaluación sigue este orden estricto:
 
 | Orden | Condición Evaluada | HTTP | Estado resultante del QR | Mensaje mostrado al Verificador | ¿Consume QR? |
 | :---- | :--- | :---: | :--- | :--- | :--- |
-| **1** | Firma criptográfica inválida o folio inexistente | `400`/`404` | Sin cambio | `"Boleto no válido"` | No |
-| **2** | `boleto.estado == INVALIDADO` o función/evento cancelado | `400`/`404` | Sin cambio | `"Boleto no válido"` | No |
+| **1** | Entrada o firma inválida (`400`), boleto o folio inexistente (`404`) | `400`/`404` | Sin cambio | `"Boleto no válido"` | No |
+| **2** | `boleto.estado == INVALIDADO` o función/evento cancelado | `400` | Sin cambio | `"Boleto no válido"` | No |
 | **3** | `boleto.estado IN (USADO, USADO_CONTINGENCIA)` o `usado_en IS NOT NULL` | `409` | Sin cambio | `"Ya ingresó a las HH:MM"` | No |
 | **4** | Respaldo manual o contexto con `funcion_id` activa distinta al boleto | `409` | Sin cambio | `"Boleto de la función DD/MM HH:MM"` | No |
 | **5** | `now() < funcion.inicio_en - 2 horas` | `422` | Sin cambio | `"Abre a las HH:MM"` | No |
