@@ -16,8 +16,9 @@ Toda prueba diseñada o ejecutada debe alinearse estrictamente con los artefacto
 | Modelo de datos v6.2 | [modelo-datos.md](modelo-datos.md) | 44 tablas, 14 FKs compuestas (`RunSQL`), `ExclusionConstraint` (`btree_gist`), `on_delete=PROTECT`, roles `teatro_owner` / `teatro_app`. |
 | Máquinas de estado | [maquinas-de-estado.md](maquinas-de-estado.md) | 43 transiciones oficiales (`T-1.1`–`T-1.17`, `T-2.1`–`T-2.10`, `T-3.1`–`T-3.8`, `T-4.1`–`T-4.8`). |
 | Contrato de API | [contrato-api.md](contrato-api.md) | Rutas `/api/v1/`, esquemas JSON, códigos HTTP, códigos `code` estables y `Idempotency-Key`. |
-| Stack y exclusiones técnicas | [stack-tecnologico.md](stack-tecnologico.md) | Django 5.2 `TestCase`/`TransactionTestCase` (sin `pytest`), PostgreSQL 16 (sin SQLite), Vitest, Playwright, `ruff`, `import-linter`. |
-| Requerimientos funcionales | [requisitos-funcionales.md](requisitos-funcionales.md) | 103 requerimientos atómicos (`RF-01` a `RF-103`) distribuidos en 10 módulos. |
+| Stack y exclusiones técnicas | [stack-tecnologico.md](stack-tecnologico.md) | Django 5.2 `TestCase`/`TransactionTestCase` (sin `pytest`), PostgreSQL 16 (sin SQLite), Vitest, Playwright, `ruff`, `import-linter`, `k6` (QA). |
+| Requerimientos funcionales | [requisitos-funcionales.md](requisitos/requisitos-funcionales.md) | 103 requerimientos atómicos (`RF-01` a `RF-103`) distribuidos en 10 módulos. |
+| Requerimientos no funcionales | [requisitos-no-funcionales.md](requisitos/requisitos-no-funcionales.md) | 43 requerimientos no funcionales verificables (`RNF-01` a `RNF-43`) bajo ISO/IEC 25010. |
 | Diagramas UML | `docs/diagramas-uml/` | 10 diagramas de casos de uso (`01`–`10`), robustez (`RB01`–`RB10`), secuencia (`SD01`–`SD10`) y clases. |
 
 ### 1.2. Objetivos de Calidad Verificables
@@ -52,7 +53,7 @@ En correspondencia con [alcance.md](alcance.md) §4 y [stack-tecnologico.md](sta
 
 ## 3. Matriz de Trazabilidad de Requisitos (RTM)
 
-Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`), las **43 transiciones oficiales** (`T-1.1`–`T-4.8`) y los **10 diagramas de secuencia** (`SD01`–`SD10`) hacia los niveles y técnicas de prueba.
+Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`), los **43 requerimientos no funcionales** (`RNF-01`–`RNF-43`), las **43 transiciones oficiales** (`T-1.1`–`T-4.8`) y los **10 diagramas de secuencia** (`SD01`–`SD10`) hacia los niveles y técnicas de prueba.
 
 ### 3.1. Módulo 1 — Configuración Administrativa y Catálogos Base (`SD08`)
 | RF | Transiciones / Reglas | Endpoint(s) | Niveles y Técnicas de Prueba |
@@ -197,6 +198,53 @@ Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`),
 | `RF-102` | Recordatorios `3 d` y cada `7 d` + alerta pre-reserva `48 h` | Celery Beat `enviar_recordatorios_requisitos` | `TestCase` (`timezone.now` + `mail.outbox`) |
 | `RF-103` | Aviso reprogramación a compradores con cuenta | Celery Worker + Mailpit | `TestCase` (omite ventas presenciales sin cuenta) |
 
+### 3.11. Matriz de Trazabilidad de Requisitos No Funcionales (`RNF-01`–`RNF-43`)
+| RNF | Categoría ISO/IEC 25010 | Criterio / Umbral Verificable | Nivel y Técnica de Prueba |
+| :--- | :--- | :--- | :--- |
+| `RNF-01` | Eficiencia de Desempeño | Cartelera, mapa y disponibilidad `p95 < 300 ms` | Prueba de carga `k6` (perfil Docker QA), `TestCase` |
+| `RNF-02` | Eficiencia de Desempeño | `POST /api/v1/boletos/validar/` `p95 < 200 ms`, `of=('self',)` | Prueba de carga `k6`, `TransactionTestCase` |
+| `RNF-03` | Eficiencia de Desempeño | `150–250` usuarios concurrentes sin errores `5xx` | Prueba de carga `k6` (rampa 250 VUs), monitoreo `/health/` |
+| `RNF-04` | Eficiencia de Desempeño | `.values_list()`, caché Redis `2–3 s`, `ETag`/`304`, `Cache-Control` | `TestCase` (Redis invalidation + HTTP headers) |
+| `RNF-05` | Eficiencia de Desempeño | Polling `10–15 s`, pausa `visibilityState`, `React.memo` | `Vitest` + `React Testing Library` |
+| `RNF-06` | Eficiencia de Desempeño | Paginación `20` (`1..100`), `django-filter -> 400` | `TestCase`, `Schemathesis` |
+| `RNF-07` | Eficiencia de Desempeño | `6m` Nginx, póster `<= 5 MB`, `MAX_IMAGE_PIXELS` | `TestCase` (`poster_grande.png`), inspección `nginx.conf` |
+| `RNF-08` | Eficiencia de Desempeño | `1,728` filas `bulk_create`, raíz `sala_id` multi-sala | `TestCase`, introspección esquema PostgreSQL |
+| `RNF-09` | Confiabilidad | Disponibilidad `>= 99.5%`, `restart: unless-stopped` | Monitoreo `/api/v1/health/`, inspección `docker-compose.yml` |
+| `RNF-10` | Confiabilidad | `0%` sobreventa, `0` `40P01`, orden candados, `nowait`/`skip_locked`, índice parcial | `TransactionTestCase` multihilo, inspección `pg_indexes` |
+| `RNF-11` | Confiabilidad | `0%` empalmes agenda (`TSTZRANGE`, `ExclusionConstraint` `btree_gist`) | `TransactionTestCase`, introspección `pg_constraint` |
+| `RNF-12` | Confiabilidad | `0%` doble acceso QR (`100%` online sin PWA, `of=('self',)`) | `TransactionTestCase`, `Playwright` (`acceso.spec.ts`) |
+| `RNF-13` | Confiabilidad | Idempotencia `stripe_event_id`, `Idempotency-Key >= 24 h`, fuera locks BD, `on_commit` | `TestCase`, `TransactionTestCase` |
+| `RNF-14` | Confiabilidad | `ON DELETE PROTECT` 100%, `14` FKs compuestas, `0` borrado físico | Introspección `apps.get_models()` + `pg_constraint` |
+| `RNF-15` | Confiabilidad | `NUMERIC(10,2)`/`Decimal`/`ROUND_HALF_UP`, `0` float, paridad `$0.00` | `Hypothesis` (PBT), diferencial TS vs Python (500 casos) |
+| `RNF-16` | Confiabilidad | UTC (`TIMESTAMPTZ`)/NTP + `America/Mexico_City`, ISO 8601 | `TestCase` (`timezone.now`), `Evals` (`eval_cotizaciones_plazos.json`) |
+| `RNF-17` | Confiabilidad | `RPO <= 24 h`, `RTO <= 2 h` (`pg_dump` + `/media/` cifrado) | Simulacro `pg_restore` y verificación cron |
+| `RNF-18` | Confiabilidad | Contingencia PDF/CSV (`24 h` antes), 1 abierta/función, reconciliación | `TestCase`, `Playwright` (`contingencia.spec.ts`) |
+| `RNF-19` | Seguridad | Sesiones Redis `db 0/1/2` (`HttpOnly`/`Secure`/`SameSite=Lax`), CSRF, sin CORS/JWT | `TestCase`, Revisión Adversarial Red Team 1 |
+| `RNF-20` | Seguridad | Revocación inmediata (`is_active` + `session_version`) | `TestCase` (`apps/usuarios/tests/`) |
+| `RNF-21` | Seguridad | `Argon2`, token `30 min` un uso, anti-enumeración | `TestCase`, inspección `settings.py`, Red Team 1 |
+| `RNF-22` | Seguridad | RBAC 5 perfiles, anti-IDOR, sin Django Admin, bundles `/` vs `/gestion/` | `TestCase`, Red Team 1, verificación de build |
+| `RNF-23` | Seguridad | Roles PG (`teatro_owner`/`teatro_app`), `REVOKE UPDATE, DELETE` auditoría | `TestCase` (`InsufficientPrivilege` sobre BD real) |
+| `RNF-24` | Seguridad | PCI-DSS delegado (`Stripe Elements`, `0` tarjetas/CVV en servidor) | Auditoría serializers/modelos, `Playwright` (`compra.spec.ts`) |
+| `RNF-25` | Seguridad | Verificación `Stripe-Signature` sobre bytes crudos (`400` si inválida) | `TestCase`, Red Team 2 |
+| `RNF-26` | Seguridad | QR `UUID v4` + `HMAC-SHA256` (`QR_HMAC_SECRET`), `folio_corto >= 8` Base32 `secrets` | `TestCase`, `Evals` (`eval_qr_me04.json`), Red Team 1 |
+| `RNF-27` | Seguridad | `TLS 1.2/1.3`, UFW (`80/443`), PG/Redis aislados | Inspección Nginx/UFW/`docker-compose.yml`, escaneo QA |
+| `RNF-28` | Seguridad | Rate limit Nginx IP + `ScopedRateThrottle` `user.id` (`429` + `Retry-After`) | `TestCase`, prueba perimetral Nginx, Red Team 1 |
+| `RNF-29` | Seguridad | Cabeceras Nginx (`HSTS`, `nosniff`, `DENY`, `CSP` `/media/`) | Verificación HTTP headers sobre perfil Nginx QA |
+| `RNF-30` | Seguridad | ORM parametrizado + `django-filter`, Pillow EXIF stripping + UUID | `Schemathesis`, `TestCase` (`poster_valido.jpg`, `archivo_falso.jpg`) |
+| `RNF-31` | Seguridad | LFPDPPP (`aceptacion_legal`), `RegistroAuditoria`, `0` `.env`/secretos en Git | `TestCase`, inspección de repositorio antes de commit |
+| `RNF-32` | Usabilidad | Responsive sin overflow horizontal (`360 px` a `1280 px`) | `Playwright` (`360x800` y `1280x800`) |
+| `RNF-33` | Usabilidad | Contraste **WCAG 2.1 AA/AAA**, `>= 12 px`, `Manrope tabular-nums` | Auditoría UI / `Playwright` + checklist `teatro-design-system` |
+| `RNF-34` | Usabilidad | Distinción no cromática (`5` estados + `12` accesibles `♿`) | `Vitest` + `RTL`, revisión visual mapa SVG |
+| `RNF-35` | Usabilidad | Español MX (`Intl.*`), JSON uniforme, `6` mensajes literales puerta QR | `Vitest`, `Evals` (`eval_qr_me04.json`) |
+| `RNF-36` | Mantenibilidad | Capas ADP (`6` base + `5` dominio), `Service Layer`, adaptadores en bordes | `lint-imports` (`import-linter`), prueba FKs `apps.get_models()` |
+| `RNF-37` | Mantenibilidad | Migraciones Django única fuente de BD (`database/*.sql` pasivo) | CI `makemigrations --check --dry-run` |
+| `RNF-38` | Mantenibilidad | `0` errores en `ruff`, `tsc --noEmit`, `eslint`, `prettier` | Etapa 1 pipeline CI |
+| `RNF-39` | Mantenibilidad | Cobertura `>= 90%`, mutación `>= 85%`, `TestCase`/`TransactionTestCase` | Etapas 2/5 CI (`manage.py test`, `vitest run`, `mutmut`) |
+| `RNF-40` | Mantenibilidad | Logs UTC rotados (`logrotate`) + `/api/v1/health/` sin secretos | `TestCase`, inspección de configuración logging |
+| `RNF-41` | Compatibilidad | iOS Safari / Android Chrome, `getUserMedia()` HTTPS, sin app nativa/PWA | Pruebas manuales móviles, `Playwright` (`acceso.spec.ts`) |
+| `RNF-42` | Portabilidad | Mínimo `2 vCPU / 4 GB / 40 GB SSD`, límites Gunicorn/Celery/Redis/`mem_limit` | Inspección `docker-compose.yml`, prueba de carga `k6` |
+| `RNF-43` | Portabilidad | Docker Compose v2, `0` Node en prod, `reportlab` puro (sin Cairo/Chromium) | `docker compose up --build`, inspección `Dockerfile`/`requirements.txt` |
+
 ---
 
 ## 4. Estrategia por Niveles de Prueba Tradicionales (Stack Oficial)
@@ -234,6 +282,13 @@ Ubicadas en `frontend/tests/e2e/`, ejecutadas contra el stack completo en Docker
 3. `acceso.spec.ts`: Login `VERIFICADOR` en viewport móvil `360x800` -> escaneo válido, duplicado, otra función, fuera de ventana -> respaldo manual por `folio_corto`.
 4. `cotizacion.spec.ts`: `USUARIO` cotiza evento multi-día -> `ADMIN` propone alternativas -> `USUARIO` acepta -> `ADMIN` ajusta versión y aprueba -> pago -> póster y configurador de secciones/fases -> publicación.
 5. `contingencia.spec.ts`: `ADMIN` exporta PDF/CSV (`<= 24 h`) -> activa contingencia -> reconcilia CSV en lote -> verifica estados `USADO_CONTINGENCIA` y cierre del historial.
+
+### 4.6. Pruebas No Funcionales (Carga `k6`, Seguridad Perimetral, Accesibilidad y Contingencia)
+Orientadas a verificar los 43 requisitos de [requisitos-no-funcionales.md](requisitos/requisitos-no-funcionales.md) (`RNF-01`–`RNF-43`):
+1. **Pruebas de carga y latencia (`k6` externo sobre perfil Docker producción local):** Scripts en `backend/tests/load/` (ejecutados vía CLI/contenedor externo `k6` sin alterar `requirements.txt`) simulando rampa de `150–250` usuarios concurrentes en cartelera, lectura/polling de mapa (`1,728` butacas) y ráfaga de puerta QR (`POST /api/v1/boletos/validar/`), validando `p95 < 300 ms` (`RNF-01`, `RNF-03`), `p95 < 200 ms` en QR (`RNF-02`) y `0%` de respuestas `5xx`.
+2. **Seguridad perimetral, cabeceras HTTP y throttling:** Verificación contra Nginx local de cabeceras `HSTS`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y `CSP` (`default-src 'none'` en `/media/`) (`RNF-29`), exclusión de TLS `< 1.2` (`RNF-27`), límites de tasa Nginx IP vs `ScopedRateThrottle` (`429` + `Retry-After`) (`RNF-28`), rechazo de JWT/CORS (`RNF-19`) y auditoría de permisos PostgreSQL del rol `teatro_app` (`RNF-23`).
+3. **Accesibilidad `WCAG 2.1 AA/AAA` y responsividad (`360 px`):** Validación automatizada en `Playwright` para viewports `360x800` y `1280x800` verificando `scrollWidth <= innerWidth` (`RNF-32`), legibilidad `>= 12 px` con `tabular-nums`, contraste `#0F172A` sobre `#E58E26` (`RNF-33`) y diferenciación no cromática de los `5` estados + `12` localidades accesibles `♿` (`RNF-34`).
+4. **Simulacro de respaldos y recuperabilidad (`RPO/RTO`):** Prueba de volcado `pg_dump` comprimido y restauración íntegra con `pg_restore` junto con directorio `/media/` verificando `RPO <= 24 h` y `RTO <= 2 h` (`RNF-17`).
 
 ---
 
@@ -361,7 +416,8 @@ flowchart LR
 | Cobertura de líneas/ramas en `services.py` y `permissions.py` | **$\ge 90\%$** |
 | Evals deterministas (100 casos ground-truth) | **100 / 100** |
 | Pruebas diferenciales (estimación TS vs Python, 500 casos) | **0 discrepancias** (`$0.00` diferencia) |
-| Pruebas E2E (`Playwright`, 5 specs críticos) | **100% pasando** (escritorio + móvil `360px` en `acceso.spec.ts`) |
+| Pruebas E2E (`Playwright`, 5 specs críticos + `360px`) | **100% pasando** (`0` desbordamientos desde `360 px` y `0` errores críticos `WCAG 2.1 AA`) |
+| Rendimiento y Carga (`k6` QA, `150–250` VUs) | **Cartelera/mapa `< 300 ms` (p95)**, **Validación QR `< 200 ms` (p95)**, **`0%` errores `5xx`** |
 | API Fuzzing (`Schemathesis`) | **0 errores `500`** |
 | Mutation Testing (`mutmut` en servicios críticos) | **$\ge 85\%$** y **0 mutantes vivos** en candados y límites numéricos |
 | Revisión Adversarial Multi-Agente (Red Team / Judge) | **0 hallazgos CRÍTICOS o ALTOS abiertos** |
@@ -385,9 +441,9 @@ Para equilibrar velocidad de feedback en cada PR con profundidad de verificació
 | **2. Unitarias, PBT, Metamórficas y Evals** | Cada push / PR | `python manage.py test` (PostgreSQL 16 + Redis), `npm test` (Vitest + `fast-check`) | `< 4 min` |
 | **3. Concurrencia Real y Diferenciales** | Cada PR a `main` | `python manage.py test --tag=concurrencia`, script diferencial TS vs Python | `< 5 min` |
 | **4. E2E Playwright** | Cada PR a `main` | `npm run test:e2e` contra Docker Compose (Nginx + Gunicorn + Mailpit) | `< 8 min` |
-| **5. Fuzzing, Mutación y Red Team** | Pre-release / nocturno (`schedule`) | `st run ...` (`Schemathesis`), `mutmut run ...`, revisión adversarial EGM | `15–25 min` |
+| **5. Fuzzing, Carga `k6`, Mutación y Red Team** | Pre-release / nocturno (`schedule`) | `st run ...` (`Schemathesis`), `k6 run ...`, `mutmut run ...`, revisión adversarial EGM | `15–25 min` |
 
 ### 8.2. Responsabilidades del Equipo (6 Integrantes)
 * **Autor de cada PR:** Escribe pruebas unitarias (`TestCase`/`Vitest`), propiedades PBT si toca cálculos/geometría y mantiene en verde las Etapas 1 y 2.
-* **Responsable de Backend / BD:** Mantiene pruebas de integridad de esquema (`pg_constraint`, `PROTECT`, cross-layer FK), suites `TransactionTestCase` de concurrencia y corridas de `mutmut` / `Schemathesis`.
-* **Responsable de Frontend / QA:** Mantiene specs `Playwright` (escritorio y móvil `360 px`), pruebas `fast-check`, prueba diferencial de estimaciones y ejecuta la revisión adversarial multi-agente antes de cerrar cada semana del cronograma de 4 semanas.
+* **Responsable de Backend / BD:** Mantiene pruebas de integridad de esquema (`pg_constraint`, `PROTECT`, cross-layer FK), suites `TransactionTestCase` de concurrencia, escenarios `k6` y corridas de `mutmut` / `Schemathesis`.
+* **Responsable de Frontend / QA:** Mantiene specs `Playwright` (escritorio y móvil `360 px` + accesibilidad `WCAG 2.1 AA`), pruebas `fast-check`, prueba diferencial de estimaciones y ejecuta la revisión adversarial multi-agente antes de cerrar cada semana del cronograma de 4 semanas.

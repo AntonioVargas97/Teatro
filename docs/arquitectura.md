@@ -585,6 +585,8 @@ Al tratarse de una plataforma con pagos electrónicos, control de aforo y acceso
 | **Disponibilidad** | ≥ 99.5% durante ventanas activas de venta y acceso a funciones; reinicio automático de contenedores/servicios ante fallos. |
 | **Usabilidad Móvil** | Interfaz responsiva con Tailwind CSS operativa en pantallas desde 360 px de ancho (iOS Safari y Android Chrome), especialmente en ValidarAccesoPage.tsx, configurador de secciones del evento y consulta de boletos. |
 
+> **Catálogo completo trazable (ISO/IEC 25010):** El desglose exhaustivo de los **43 requerimientos no funcionales** (`RNF-01` a `RNF-43`, incluyendo seguridad, idempotencia, accesibilidad WCAG 2.1 AA, arquitectura ADP y criterios de verificación) reside en [`docs/requisitos/requisitos-no-funcionales.md`](./requisitos/requisitos-no-funcionales.md).
+
 ## **2. Dimensionamiento Mínimo del Servidor**
 
 Para ejecutar de forma estable Nginx, Gunicorn (Django), Celery Worker, Celery Beat, PostgreSQL y Redis en un servidor único (**sin proceso Node.js residente en producción**):
@@ -681,9 +683,15 @@ teatro-coatzacoalcos/
 │   ├── alcance.md
 │   ├── arquitectura.md
 │   ├── stack-tecnologico.md
+│   ├── contrato-api.md
 │   ├── modelo-datos.md            Modelo relacional v6.2 (44 tablas)
 │   ├── modelado_datos/            Diagramas draw.io v6.2 (MR y ER Chen)
 │   ├── maquinas-de-estado.md
+│   ├── plan-pruebas.md            Plan Maestro ISO/IEC/IEEE 29119-3
+│   ├── diagramas-uml/             Clases, casos de uso, robustez y secuencia (PlantUML)
+│   ├── requisitos/
+│   │   ├── requisitos-funcionales.md      103 RF atómicos
+│   │   └── requisitos-no-funcionales.md   43 RNF (ISO/IEC 25010)
 │   └── reportes/
 ├── scripts/
 │   ├── instalar-dependencias.ps1
@@ -742,6 +750,7 @@ Para garantizar la estabilidad del sistema, prevenir fallos críticos en la vent
 ## **2. Pruebas de Concurrencia y Rendimiento**
 
 * **Simulación de Alta Concurrencia:** Ejecución de pruebas mediante `TransactionTestCase` orientadas a verificar la jerarquía de bloqueos a nivel de fila (`usuario -> orden_compra -> disponibilidad_butaca -> orden_compra_detalle -> boleto` con `select_for_update(nowait=True)`), el límite ≤ 10 entre pestañas paralelas (`APARTADO + PAGO_EN_PROCESO + PAGADA`) y la restricción `ExclusionConstraint` sobre `BloqueoAgenda` (`PROPUESTA_RETENIDA`, `PRE_RESERVADO`, `CONFIRMADO`), garantizando 0% de sobreventas (ni siquiera entre web y taquilla simultáneas), 0% de empalmes de fechas y 0% de dobles accesos al escanear QR.
+* **Pruebas de Carga y Latencia (`k6` en QA):** Ejecución externa pre-release mediante el CLI `k6` contra el perfil Docker Compose local (Nginx + Gunicorn + PostgreSQL + Redis) para verificar el soporte simultáneo de `150–250` usuarios concurrentes, `p95 < 300 ms` en cartelera/mapa/disponibilidad y `p95 < 200 ms` en validación QR (`RNF-01`–`RNF-03`, detallado en `docs/plan-pruebas.md`).
 
 ## **3. Automatización (CI/CD)**
 

@@ -31,6 +31,7 @@ Este documento define las tecnologías base, motores de infraestructura, herrami
 | **Certbot (Let's Encrypt)** | Producción (servidor propio) | Emisión y renovación automática de certificados HTTPS (TLS 1.2 y TLS 1.3), habilitando cookies Secure y acceso a cámara móvil para escaneo QR. |
 | **pg_dump + cron** | Producción (servidor propio) | Respaldos diarios automatizados y comprimidos de PostgreSQL hacia almacenamiento externo cifrado, cumpliendo el objetivo RPO (*Recovery Point Objective*) ≤ 24horas y RTO (*Recovery Time Objective*) ≤ 2horas. |
 | **GitHub Actions** | CI/CD (.github/workflows/pruebas.yml) | Ejecución automatizada en cada contribución de Django TestCase, import-linter, ruff, ESLint + Prettier, Vitest y pruebas de integración. |
+| **k6** | QA / Pre-release (CLI externo o contenedor) | Ejecución externa de pruebas de carga y rendimiento contra el perfil Docker local para validar `p95 < 300 ms` (`150–250` usuarios concurrentes) y `< 200 ms` en validación QR (`RNF-01`–`RNF-03`), sin añadir dependencias a `requirements.txt` ni `package.json`. |
 
 ## **2. Dependencias del Backend (backend/requirements.txt)**
 
