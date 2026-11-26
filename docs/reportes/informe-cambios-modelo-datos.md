@@ -1,7 +1,7 @@
-# Informe de cambios al modelo de datos (v5.3 → v6.1)
+# Informe de cambios al modelo de datos (v5.3 → v6.2)
 
 * **Proyecto:** Plataforma de boletaje y cotización de arrendamiento del Teatro de la Ciudad de Coatzacoalcos.
-* **Estado del modelo:** propuesta v6.1 para revisión del equipo (sustituye al ER v5.3 como base para `models.py` una vez aprobada).
+* **Estado del modelo:** versión final v6.2 para implementar (sustituye al ER v5.3 como base para `models.py`). Este informe cubre el paso de la v5.3 a la v6.1 (secciones 1 a 5) y el de la v6.1 a la v6.2 (sección 6).
 * **Fecha del informe:** 2026-11-25.
 * **Responsable de criterios de diseño:** Sanji.
 
@@ -9,15 +9,15 @@
 
 ## 1. Introducción
 
-Este informe explica qué cambió entre el diagrama entidad-relación v5.3, que la auditoría EGM dictaminó **NO LISTO / BLOQUEADO**, y el modelo relacional v6.1. Describe el problema que resolvía cada cambio, los criterios de diseño impuestos por Sanji y el diccionario de datos completo de las 43 tablas del modelo.
+Este informe explica qué cambió entre el diagrama entidad-relación v5.3, que la auditoría EGM dictaminó **NO LISTO / BLOQUEADO**, y el modelo relacional v6.2 (la sección 6 documenta el paso de la v6.1 a la v6.2). Describe el problema que resolvía cada cambio, los criterios de diseño impuestos por Sanji y el diccionario de datos completo de las 44 tablas del modelo.
 
 Documentos de referencia (rutas relativas a la raíz del proyecto):
 
-* `docs/modelo-datos.md`: modelo relacional v6.1. Es la **fuente principal**; el diccionario está en su sección 4 y las decisiones en las secciones 1, 5, 6 y 7.
+* `docs/modelo-datos.md`: modelo relacional v6.2. Es la **fuente principal**; el diccionario está en su sección 4 y las decisiones en las secciones 1, 5, 6 y 7.
 * `docs/reportes/auditoria-egm-er-v5.3.md`: auditoría del ER v5.3, con los hallazgos `ER-C01` a `ER-C06` (críticos), `ER-I01` a `ER-I06` (altos) y `ER-M01` a `ER-M05` (medios).
 * `docs/alcance.md`: alcance funcional del sistema. La sección 2.3 fue reescrita para la v6.1.
-* `docs/modelado_datos/Teatro_MR_v6.1.drawio`: modelo relacional completo en draw.io.
-* `docs/modelado_datos/Teatro_ER_Chen_v6.1.drawio`: diagrama entidad-relación en notación Chen.
+* `docs/modelado_datos/Teatro_MR_v6.2.drawio`: modelo relacional completo en draw.io.
+* `docs/modelado_datos/Teatro_ER_Chen_v6.2.drawio`: diagrama entidad-relación en notación Chen.
 
 ### Convenciones de lectura del diccionario
 
@@ -176,14 +176,14 @@ Con la opción C, `seccion_evento` no tiene `seccion_id`: es una sección lógic
 
 ## 4. Diccionario de datos
 
-Organizado por módulo, igual que la sección 4 de `modelo-datos.md`. Son 43 tablas en 9 módulos.
+Organizado por módulo según la v6.1 (9 módulos). En la v6.2 cambia el módulo de algunas tablas (sección 6.2) y se agrega `cotizacion_version`: el modelo final tiene 44 tablas en 11 módulos. Las columnas y tablas nuevas de la v6.2 se describen en la sección 6.4.
 
 | Módulo | Tablas |
 | :---- | :---- |
 | `usuarios` | `usuario`, `aceptacion_legal` |
-| `configuracion` (transversal) | `configuracion_sistema`, `turno`, `servicio_extra` |
-| `agenda` (transversal) | `sala`, `bloqueo_agenda` |
-| `auditoria` (transversal) | `registro_auditoria` |
+| `configuracion` (base) | `configuracion_sistema`, `turno`, `servicio_extra` |
+| `agenda` (base) | `sala`, `bloqueo_agenda` |
+| `auditoria` (base) | `registro_auditoria` |
 | `cartelera` | `categoria`, `evento`, `bloque_evento_directo`, `funcion`, `reprogramacion_funcion`, `resolucion_vencimiento` |
 | `inventario` | `seccion`, `palco`, `butaca`, `seccion_evento`, `asignacion_butaca`, `fase_venta`, `precio_seccion`, `disponibilidad_butaca`, `bloqueo_tecnico` |
 | `ventas` | `orden_compra`, `orden_compra_detalle`, `pago_orden`, `reembolso_orden`, `webhook_stripe` |
@@ -228,7 +228,7 @@ Organizado por módulo, igual que la sección 4 de `modelo-datos.md`. Son 43 tab
 
 Restricciones de tabla: UQ (`usuario_id`, `documento`, `version`).
 
-### 4.2 Módulo `configuracion` (transversal)
+### 4.2 Módulo `configuracion` (base)
 
 #### `configuracion_sistema`
 
@@ -286,7 +286,7 @@ Restricciones de tabla: `CHECK (id = 1)`. `CHECK` de valores positivos en los pa
 | precio_referencia | NUMERIC(10,2) | `CHECK (>= 0)` | Precio base referencial, neto en MXN |
 | activo | BOOLEAN | — | Se desactiva, nunca se borra |
 
-### 4.3 Módulo `agenda` (transversal)
+### 4.3 Módulo `agenda` (base)
 
 #### `sala`
 
@@ -317,11 +317,11 @@ Restricciones de tabla: `CHECK (id = 1)`. `CHECK` de valores positivos en los pa
 
 Restricciones de tabla: extensión `btree_gist`. `EXCLUDE USING gist (sala_id WITH =, rango WITH &&) WHERE (estado <> 'LIBERADO')`. `CHECK ((estado IN ('PROPUESTA_RETENIDA','PRE_RESERVADO')) = (expira_en IS NOT NULL))`.
 
-### 4.4 Módulo `auditoria` (transversal)
+### 4.4 Módulo `auditoria` (base)
 
 #### `registro_auditoria`
 
-**Propósito:** bitácora de acciones relevantes del sistema. Es solo de inserción (*append-only*); se recomienda revocar `UPDATE` y `DELETE` al usuario de la aplicación sobre esta tabla. Es una referencia polimórfica (`entidad`, `entidad_id`) a propósito, porque el módulo transversal no puede tener FKs hacia módulos de dominio.
+**Propósito:** bitácora de acciones relevantes del sistema. Es solo de inserción (*append-only*); se recomienda revocar `UPDATE` y `DELETE` al usuario de la aplicación sobre esta tabla. Es una referencia polimórfica (`entidad`, `entidad_id`) a propósito, porque el módulo base no puede tener FKs hacia módulos de dominio.
 
 | Columna | Tipo | Restricciones / llaves | Descripción |
 | :---- | :---- | :---- | :---- |
@@ -938,3 +938,89 @@ Los pendientes siguen la sección 9 de `docs/modelo-datos.md`:
 * **Cobertura de hallazgos no declarada.** La matriz de la sección 5 de `modelo-datos.md` no tiene fila para `ER-I06`, `ER-M02`, `ER-M04` ni `ER-M05`. Su atención se infiere del diseño, pero la fuente no la documenta. Conviene agregarlas a la matriz o declarar que quedan fuera de alcance.
 * **Redacción de nombres en `alcance.md` §2.3.** Según la lectura actual, §2.3 ya describe fases de venta y precio por sección y fase. Sin embargo, sigue usando la regla de nombre por defecto `{Sección} - Zona {N}` al subdividir. La sección 3.4 de `modelo-datos.md` indica que esa regla de nombre compuesto ya no aplica cuando una sección del evento abarca varias físicas. Hay que resolver esa diferencia.
 * **Nulos en `configuracion_sistema`.** La fuente no declara el tipo de los parámetros de esta tabla, solo su valor por defecto. En este informe se marcaron con `—`. Conviene definir sus tipos (por ejemplo, `INTEGER` o `NUMERIC`) antes de escribir `models.py`.
+
+---
+
+## 6. Cambios de la v6.1 a la v6.2 (versión final)
+
+La v6.2 parte de la v6.1 sin cambiar la estructura de la sala, de las secciones del evento ni del inventario por función. Agrega cuatro atributos rescatados del ER v5.6, reorganiza los módulos para eliminar dependencias circulares y cambia la clave primaria de dos tablas puente. La tabla siguiente resume el cambio.
+
+| Tema | Cambio en la v6.2 | Fuente |
+| :---- | :---- | :---- |
+| Rescates del ER v5.6 | Se incorporan `propuesta_fecha.motivo`, `seccion.acceso_puerta`, la tabla `cotizacion_version` y `cotizacion_parametros.asistentes_acordados`. | §6, decisión 7 |
+| Módulos | `recinto` y `pagos` pasan a ser módulos base. Cuatro tablas de inventario pasan a `cartelera` y `categoria` pasa a `configuracion`. Desaparecen cuatro dependencias circulares. | §2 y §6, decisión 8 |
+| Claves primarias | `asignacion_butaca` y `precio_seccion` usan `id` sustituto con `UNIQUE` en sus dos columnas. | §6, decisión 9, y §8 |
+| Columna eliminada | `cotizacion.monto_oficial`. | §4.7 |
+| Conteo | 44 tablas (la v6.1 tenía 43) y 14 FKs compuestas. | §10 |
+
+### 6.1 Rescates del ER v5.6
+
+Se revisó la v5.6 atributo por atributo y se incorporan cuatro elementos:
+
+| Origen en v5.6 | Destino en v6.2 | Por qué |
+| :---- | :---- | :---- |
+| `Propuesta_Fecha.motivo` | `propuesta_fecha.motivo` (TEXT, N) | El solicitante necesita entender por qué se le ofrecen otras fechas o por qué se reprograma. |
+| `Sección.acceso_puerta` | `seccion.acceso_puerta` (TEXT, N) | Es un dato del lugar físico. Ayuda al asistente y al Verificador, y se puede imprimir en el boleto sin costo. |
+| `Cotización.numero_version` | Tabla `cotizacion_version` | El Admin puede ajustar el monto oficial más de una vez. Un contador suelto pierde los montos anteriores. |
+| `Cotización.ocupación_acordada` | `cotizacion_parametros.asistentes_acordados` | El aforo acordado al aprobar puede diferir del estimado al solicitar. Va en el *snapshot* porque no existe antes de la aprobación. |
+
+Se descartan, con su razón: `Sección.pasillo` (el alcance no lo pide y `acceso_puerta` ya cubre la orientación), `Artista_Organizacion`, `Usuario.codigo_postal` y `pais` (fuera de alcance, ER-M01), `Boleto.codigo_barras` (el acceso es por QR) y las notas por línea de `Detalle_Cotización` (`cotizacion_servicio` y `bloque_solicitado` ya cubren lo acordado).
+
+### 6.2 Reorganización de módulos
+
+En la v6.1 el reparto de módulos formaba cuatro dependencias circulares: `cartelera` con `cotizaciones`, `cartelera` con `inventario`, `ventas` con `boletos` y `ventas` con `cotizaciones` (por el webhook). La v6.2 las elimina **sin cambiar ninguna tabla**, solo moviendo cada una a otro módulo:
+
+| Tabla | Módulo en v6.1 | Módulo en v6.2 | Motivo |
+| :---- | :---- | :---- | :---- |
+| `sala` | `agenda` | `recinto` (base) | Es la raíz del catálogo físico; `agenda` depende de `recinto` y sigue siendo neutral. |
+| `seccion`, `palco`, `butaca` | `inventario` | `recinto` (base) | Catálogo físico fijo, sin estado. |
+| `categoria` | `cartelera` | `configuracion` (base) | Catálogo fijo. |
+| `seccion_evento`, `asignacion_butaca`, `fase_venta`, `precio_seccion` | `inventario` | `cartelera` | `cartelera` es el dueño del configurador y de la publicación, así que la compuerta de publicación vive en un solo módulo. |
+| `webhook_stripe` | `ventas` | `pagos` (base) | Lo comparten `ventas` y `cotizaciones`. |
+
+El mapa resultante tiene seis módulos base (`usuarios`, `configuracion`, `recinto`, `agenda`, `auditoria` y `pagos`) y cinco de dominio en capas: `cotizaciones` < `cartelera` < `inventario` < `ventas` < `boletos`. Un módulo solo depende de módulos de su misma capa base o de capas inferiores. Los flujos que van de una capa inferior a una superior (cotización confirmada, evento publicado, orden pagada) se resuelven con eventos de dominio en proceso, descritos en `arquitectura.md`.
+
+### 6.3 Claves primarias sustitutas en tablas puente
+
+`asignacion_butaca` y `precio_seccion` dejan la clave compuesta por una clave primaria `id BIGINT` sustituta. Cada una mantiene un `UNIQUE` sobre sus dos columnas: `(evento_id, butaca_id)` en `asignacion_butaca` y `(fase_venta_id, seccion_evento_id)` en `precio_seccion`. El resultado lógico es el mismo.
+
+El motivo es técnico. En Django 5.2 un `ForeignKey` no puede apuntar a un modelo con `CompositePrimaryKey`, y `disponibilidad_butaca` apunta a `asignacion_butaca`. Además, DRF no maneja bien las claves compuestas en los serializadores. Las 14 FKs compuestas siguen existiendo en PostgreSQL, declaradas con `RunSQL` (§8 de la fuente).
+
+### 6.4 Diccionario de las columnas y tabla nuevas, y de la columna eliminada
+
+| Tabla · columna | Tipo | Notas |
+| :---- | :---- | :---- |
+| `propuesta_fecha.motivo` | TEXT, N | Explicación para el solicitante de por qué se ofrecen otras fechas o por qué se reprograma. |
+| `seccion.acceso_puerta` | TEXT, N | Puerta o acceso de la sección (ej. "Puerta 2, pasillo izquierdo"). Se muestra en el mapa y se imprime en el boleto. |
+| `cotizacion_parametros.asistentes_acordados` | INTEGER | `CHECK (> 0)`. Aforo acordado al aprobar. El tope es `sala.aforo`, validado en el servicio. |
+| `cotizacion_parametros.version_aprobada_id` | BIGINT | Versión que el Admin aprobó. FK compuesta `(version_aprobada_id, cotizacion_id) → cotizacion_version(id, cotizacion_id)`. |
+| `cotizacion.monto_oficial` | Eliminada | El monto vigente es el de la versión de mayor `numero`. El aprobado es el de `cotizacion_parametros.version_aprobada_id`. |
+
+**Tabla nueva `cotizacion_version`.** Cada monto oficial que el Admin envía al solicitante es una fila nueva.
+
+| Columna | Tipo | Notas |
+| :---- | :---- | :---- |
+| id | BIGINT | PK. |
+| cotizacion_id | BIGINT | FK `cotizacion`. |
+| numero | SMALLINT | `CHECK (numero >= 1)`. Consecutivo por cotización. |
+| monto_oficial | NUMERIC(10,2) | `CHECK (monto_oficial > 0)`. Neto en MXN. |
+| nota | TEXT | N. Explicación del ajuste para el solicitante. |
+| creada_por_id | BIGINT | FK `usuario` (Admin). |
+| creada_en | TIMESTAMPTZ | |
+
+* `UQ (cotizacion_id, numero)` y `UQ (id, cotizacion_id)`, destino de la FK compuesta de `cotizacion_parametros`.
+* Solo admite inserciones. Corregir un monto es crear una versión nueva, no editar la anterior.
+* La versión 1 se crea cuando el Admin fija el primer monto oficial. Mientras no exista ninguna versión, la cotización solo tiene `subtotal_estimado`.
+* El saldo del arrendamiento se calcula como el monto de la versión aprobada menos `monto_anticipo`. No se guarda.
+
+---
+
+## Registro de cambios (2026-11-26)
+
+| Tema | Antes | Ahora |
+| :---- | :---- | :---- |
+| Versión del informe | v5.3 → v6.1 | v5.3 → v6.2 (sección 6 nueva) |
+| Estado y referencias | Propuesta v6.1; referencias a `modelo-datos.md` y a los `.drawio` en v6.1 | Versión final v6.2; referencias a v6.2 |
+| Conteo de tablas en la introducción | 43 | 44 |
+| Sección 4 (encabezado e introducción) | «Son 43 tablas en 9 módulos»; módulos «transversales» | Organizada por módulo de la v6.1, con nota de conteo (44 tablas en 11 módulos) y referencia a la sección 6 |
+| Terminología de módulos | «transversal» en `configuracion`, `agenda` y `auditoria` | «base» |

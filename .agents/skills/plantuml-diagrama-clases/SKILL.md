@@ -24,7 +24,7 @@ Guía para producir diagramas de clases **legibles a simple vista**: relaciones 
 | Concepto | PlantUML | Regla |
 | :-- | :-- | :-- |
 | Asociación | `A "1" -- "0..*" B` | Por defecto. Multiplicidad en **ambos** extremos, siempre. |
-| Asociación navegable | `A "0..*" --> "1" B` | Flecha abierta = A conoce a B pero B no conoce a A. Úsala para reflejar dependencias unidireccionales (ej. dominio → módulos transversales, ADP). |
+| Asociación navegable | `A "0..*" --> "1" B` | Flecha abierta = A conoce a B pero B no conoce a A. Úsala para reflejar dependencias unidireccionales (ej. capas superiores → capas inferiores, o dominio → módulos base, ADP). |
 | Composición | `Todo "1" *-- "1..*" Parte` | Ciclo de vida coincidente y propiedad exclusiva (rombo relleno junto al todo). Multiplicidad del extremo todo = `1` o `0..1`. |
 | Agregación compartida | **No usar** | UML 2.5.1 no le da semántica precisa; usa asociación simple o composición. |
 | Generalización | `Hija --|> Padre` | Solo si existe herencia real en las fuentes. |
@@ -35,7 +35,8 @@ Guía para producir diagramas de clases **legibles a simple vista**: relaciones 
 
 Reglas adicionales:
 - Un atributo que apunta a otra clase del diagrama **debe ser una asociación**, no un atributo. Excepción documentada: referencias lógicas por id a módulos que no deben importarse (ej. `RegistroAuditoria.actorId`), explicadas en la leyenda.
-- Estereotipo por módulo (`<<ventas>>`, `<<cartelera>>`…) y un color por módulo con leyenda.
+- Estereotipo por módulo (`<<ventas>>`, `<<cartelera>>`…) y un color por módulo con leyenda. Separa los módulos base (`usuarios`, `configuracion`, `recinto`, `agenda`, `auditoria`, `pagos`) de los de dominio (`cotizaciones` < `cartelera` < `inventario` < `ventas` < `boletos`).
+- Navegabilidad según capas: la asociación va de la capa superior a la inferior (o de un módulo de dominio a un módulo base). Ninguna flecha sube de capa. Un módulo base nunca apunta a un módulo de dominio; la referencia ocurre por id lógico, como en `RegistroAuditoria`.
 - Nombres de rol/asociación solo si aportan significado; el verbo con `>` indica el sentido de lectura.
 - Los tipos enumerados se detallan en un diagrama aparte (`diagrama-clases-enumeraciones.puml`) para no saturar el principal.
 
@@ -76,7 +77,7 @@ powershell -File .agents/skills/plantuml-diagrama-clases/scripts/render_puml.ps1
 
 - [ ] Cada clase, atributo, multiplicidad y literal sale de las fuentes de verdad (nada inventado).
 - [ ] Multiplicidad en ambos extremos de toda asociación; sin agregación compartida.
-- [ ] Composición solo con ciclo de vida coincidente; navegabilidad respeta ADP (transversales no conocen al dominio).
+- [ ] Composición solo con ciclo de vida coincidente; navegabilidad respeta ADP (los módulos base no conocen al dominio, y cada capa solo conoce capas inferiores).
 - [ ] `check_crossings.py` → `OK: sin cruces` y revisión visual del PNG.
 - [ ] Leyenda con colores por módulo, restricciones `{xor}` y relaciones omitidas por ser derivables.
 - [ ] Enumeraciones en su diagrama aparte; los literales coinciden con `docs/maquinas-de-estado.md`.
