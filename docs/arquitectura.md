@@ -190,21 +190,26 @@ U -> FE : Selecciona butacas de una Función
 FE -> API : POST /api/v1/ventas/carrito/apartar/ {funcion_id, butacas}
 API -> PG : BEGIN + SELECT ... FOR UPDATE (NOWAIT)\nOrden: Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC)
 
-alt Butacas DISPONIBLE, cierre web vigente (> 30m antes) y <= 10 boletos (APARTADO+PAGO_EN_PROCESO+PAGADA)
-    API -> PG : Crea/actualiza OrdenCompra (APARTADO, expira_en = +10m) y DisponibilidadButaca = APARTADA + COMMIT
-    API --> FE : 200 OK (OrdenCompra de función única con expira_en)
+alt Butacas disponibles, cierre web vigente y límite acumulado <= 10 (APARTADO+PAGO_EN_PROCESO+PAGADA)
+    API -> PG : Crea o actualiza OrdenCompra; fija expira_en solo con la primera butaca\nGuarda fase y precio por nueva butaca, marca APARTADA y confirma
+    API --> FE : 200 OK (orden_id, funcion_id, estado, expira_en, detalle, total)
 else Butaca no disponible, límite > 10 o función cerrada
     API -> PG : ROLLBACK
     API --> FE : 409 Conflict (Asiento no disponible / Límite excedido / Venta cerrada)
 end
 
 U -> FE : Confirma pago con tarjeta en línea
-FE -> API : POST /api/v1/ventas/checkout/
-API -> PG : Transacción corta (LOCK Usuario -> OrdenCompra): pasa a PAGO_EN_PROCESO (gracia_hasta = +5m) y COMMIT
+FE -> API : POST /api/v1/ventas/checkout/ {orden_id}
+API -> PG : BEGIN + LOCK Usuario -> OrdenCompra; comprueba vencimiento y cierre
+break Orden APARTADO vencida o cierre web alcanzado
+    API -> PG : Expira la orden, libera sus butacas y confirma
+    API --> FE : 409 Conflict (ORDEN_EXPIRADA / VENTA_CERRADA)
+end
+API -> PG : Pasa a PAGO_EN_PROCESO con gracia_hasta = expira_en + gracia configurada\nCOMMIT antes de contactar a Stripe
 API -> ST : Crea o reutiliza PaymentIntent fuera de lock BD (tarjeta, metadata.modulo='venta', idempotency_key)
 ST --> API : client_secret
 API -> PG : Transacción corta: guarda payment_intent_id
-API --> FE : 200 OK (client_secret)
+API --> FE : 200 OK (orden_id, estado, gracia_hasta, total, client_secret)
 FE -> ST : Confirma tarjeta (Stripe Elements; si falla, permite reintento dentro de vigencia)
 
 ST -> API : POST /api/v1/ventas/webhooks/stripe/ (Stripe-Signature)
@@ -234,14 +239,17 @@ participant "Django API\n(boletos/services.py)" as API
 database "PostgreSQL" as PG
 
 V -> FE : Escanea QR con cámara (o ingresa folio manual + función activa)
-FE -> API : POST /api/v1/boletos/validar/ {token} o {folio_corto, funcion_id}
+FE -> API : POST /api/v1/boletos/validar/ {token} o {folio_corto, funcion_id}\nCon cámara y función seleccionada, adjunta funcion_id al token
 API -> API : Si es token: valida HMAC-SHA256 (QR_HMAC_SECRET) y extrae funcion_id\nSi es folio_corto: restringe a VERIFICADOR/ADMIN y audita fallos
 API -> PG : BEGIN + SELECT ... FOR UPDATE OF boleto (NOWAIT, sin bloquear fila Función)
 API -> API : Valida vigencia (no invalidado), correspondencia de función\ny ventana [hora_inicio - 2h, hora_fin]
 
-alt Boleto válido, dentro de ventana y usado_en IS NULL
-    API -> PG : UPDATE Boleto SET usado_en = NOW(), validado_por = V + COMMIT
-    API --> FE : 200 OK ("Acceso permitido" + Sección, Fila y Asiento)
+alt Entrada o firma inválida
+    API --> FE : 400 Bad Request ("Boleto no válido")
+else Boleto no encontrado
+    API --> FE : 404 Not Found ("Boleto no válido")
+else Boleto invalidado o función/evento cancelado
+    API --> FE : 400 Bad Request ("Boleto no válido")
 else Boleto ya escaneado previamente
     API -> PG : ROLLBACK
     API --> FE : 409 Conflict ("Ya ingresó a las HH:MM")
@@ -251,9 +259,9 @@ else Boleto pertenece a otra función
 else Fuera de ventana horaria (muy pronto / concluida)
     API -> PG : ROLLBACK
     API --> FE : 422 Unprocessable Entity ("Abre a las HH:MM" / "La función ya terminó")
-else Token/firma inválida, folio inexistente o boleto cancelado
-    API -> PG : ROLLBACK
-    API --> FE : 400 Bad Request / 404 Not Found ("Boleto no válido")
+else Boleto válido de la función, dentro de ventana y sin uso previo
+    API -> PG : UPDATE Boleto SET usado_en = NOW(), validado_por = V + COMMIT
+    API --> FE : 200 OK ("Acceso permitido" + Sección, Fila y Asiento)
 end
 @enduml
 ```
@@ -416,13 +424,102 @@ La comunicación entre React y Django se realiza mediante **API REST JSON** bajo
 | Endpoint base | Descripción |
 | :---- | :---- |
 | **/api/v1/usuarios/** | Registro (con aceptación LFPDPPP), inicio/cierre de sesión en Redis (cookies HttpOnly + CSRF), recuperación de contraseña por correo SMTP, consulta/edición de perfil propio y CRUD de cuentas internas (Admin). |
-| **/api/v1/cartelera/** | Consulta pública paginada y filtrable (django-filter por categoría y fecha) de eventos comerciales/públicos publicados, funciones y pósters (excluyendo privados y no publicados), CRUD de eventos directos/arrendados (Admin), carga de póster y configurador de secciones del evento, fases de venta y tarifas (≥ `$100.00 MXN`), resolución de VENCIDO_SIN_PUBLICAR y cancelaciones/reprogramaciones. |
+| **/api/v1/cartelera/** | Consulta pública paginada y filtrable (django-filter por categoría y fecha) de eventos comerciales/públicos publicados, funciones y pósters (excluyendo privados y no publicados), gestión y publicación por Admin, carga de póster y edición previa a publicación por el Solicitante de su arrendamiento pagado o por Admin, con configurador de secciones del evento, fases de venta y tarifas (≥ `$100.00 MXN`), resolución de VENCIDO_SIN_PUBLICAR y cancelaciones/reprogramaciones. |
 | **/api/v1/configuracion/** | Administración por `ADMIN` (y lectura de catálogos vigentes para usuarios autenticados en cotizador) de `ConfiguracionSistema`, tarifas/horarios de turnos oficiales y catálogo editable de servicios extra e infraestructura. |
 | **/api/v1/inventario/** | Consulta del mapa de 1,728 asientos (incluyendo accesibles), endpoint ligero para *polling* de disponibilidad en tiempo real por función, bloqueos técnicos sin QR y emisión/descarga de cortesías (`$0.00 MXN` con QR) por Admin. |
 | **/api/v1/ventas/** | Gestión unificada de `OrdenCompra` por **función única** (apartado 10 min + 5 min gracia), creación de PaymentIntent con tarjeta en **Stripe Sandbox**, recepción idempotente de *webhooks* firmados (con reembolsos técnicos automáticos fuera de ventana), endpoint protegido de venta presencial en taquilla para Cajero y consulta global para Admin. |
 | **/api/v1/boletos/** | Consulta y descarga en PDF (reportlab + QrCodeWidget) de boletos digitales del usuario y cortesías, reimpresión excepcional en taquilla, endpoint atómico `POST /api/v1/boletos/validar/` para Verificador y endpoints auditados de **modo contingencia** (exportación PDF/CSV de folios y reconciliación en lote para Admin). |
 | **/api/v1/cotizaciones/** | Envío de solicitudes de arrendamiento (un día o multi-día) con cálculo estimado informativo, descarga de comprobante PDF (reportlab), revisión y ajuste de monto oficial (*snapshot*) por Admin, envío y aceptación/rechazo de hasta 3 fechas alternativas (PROPUESTA_RETENIDA 48 h), pagos de arrendamiento (tarjeta o ficha Stripe dentro de PRE_RESERVADO 48 h y corte `D-21`), resolución de pagos extemporáneos (72 h) y solicitudes de cancelación/reprogramación. |
 | **/api/v1/agenda/** | Consulta de solo lectura del calendario maestro de ocupación (retenciones, pre-reservas, funciones, rentas y mantenimientos) y registro de bloqueos de mantenimiento restringida a Admin. |
+
+### **5.1. Carrito, cobro y taquilla**
+
+Las rutas de las tablas siguientes son relativas a `/api/v1/`. En las operaciones de sesión, React envía la cookie de sesión y `X-CSRFToken` en las peticiones de escritura. Django determina usuario, rol, hora y precios. Los importes JSON son cadenas decimales en MXN con dos posiciones; las fechas y vencimientos se entregan en ISO 8601 con desplazamiento horario.
+
+| Método y ruta | Actor y entrada | Respuesta y reglas |
+| :---- | :---- | :---- |
+| `POST ventas/carrito/apartar/` | `USUARIO`; `funcion_id` y `butacas` (lista de identificadores que desea agregar). | `200` con la orden completa. El primer asiento fija `expira_en`; añadir localidades conserva ese vencimiento. Cada nueva butaca toma la fase y el precio vigentes al apartarla. Repetir una butaca ya presente en la misma orden conserva su precio y cantidad. |
+| `POST ventas/checkout/` | `USUARIO`; `orden_id` propia, de canal `LINEA`, con al menos una butaca. | `200` con `orden_id, estado, gracia_hasta, total, client_secret`. Suma los precios del detalle. Desde `APARTADO` requiere `now() <= expira_en` y venta web abierta. El reintento de una orden ya en `PAGO_EN_PROCESO` reutiliza el intento vigente y conserva `gracia_hasta`. La confirmación firmada de Stripe acredita el pago. |
+| `POST ventas/taquilla/apartar/` | `CAJERO`; `funcion_id, butacas`; cuenta del cajero en sesión. | `200` con el mismo detalle del apartado web. Comparte inventario y temporizador con el portal; aplica el límite de 10 por operación. |
+| `POST ventas/taquilla/cobrar/` | `CAJERO`; `orden_id` de su operación y `metodo_pago` (`EFECTIVO` o `TARJETA_TERMINAL`). | `200` con `orden_id, estado: PAGADA, folio, total, boletos`. Requiere apartado vigente y taquilla abierta. Un cobro repetido sobre la misma orden ya pagada devuelve el comprobante existente. |
+
+**Consulta y liberación.** `GET ventas/ordenes/{id}/` devuelve `200` con la orden propia y su estado actualizado, también después del webhook. El Cajero consulta sus operaciones de taquilla y el Admin dispone de consulta global. `POST ventas/ordenes/{id}/liberar/` recibe `butacas` de una orden propia en `APARTADO` (Comprador o Cajero); devuelve `200` con el detalle restante y el vencimiento original. Al retirar la última localidad expira la orden. Un intento de modificar una orden en cobro devuelve `409 PAGO_EN_PROCESO`. Cancelar la operación o cerrar la sesión en taquilla libera el apartado del Cajero.
+
+**Respuesta de apartado.** El detalle incluye todas las localidades de la orden. Por ejemplo, una segunda butaca agregada al iniciar la venta general conserva el mismo vencimiento que la primera y toma el nuevo precio:
+
+```json
+{
+  "orden_id": 81,
+  "funcion_id": 12,
+  "estado": "APARTADO",
+  "expira_en": "2026-11-28T12:09:00-06:00",
+  "detalle": [
+    { "butaca_id": 412, "seccion_evento_id": 4, "fase_venta_id": 1, "precio_unitario": "150.00" },
+    { "butaca_id": 413, "seccion_evento_id": 4, "fase_venta_id": 2, "precio_unitario": "200.00" }
+  ],
+  "total": "350.00"
+}
+```
+
+* **Conflictos del apartado:** La selección se procesa completa. Una butaca ocupada devuelve `409 ASIENTO_NO_DISPONIBLE`; superar los 10 boletos acumulados por cuenta y función (`APARTADO + PAGO_EN_PROCESO + PAGADA`) devuelve `409 LIMITE_BOLETOS`. Un conflicto deja intacto el apartado vigente.
+* **Cambio de función:** Si hay otra orden `APARTADO`, la API devuelve `409 CAMBIO_FUNCION` con su `orden_id` en `details`. Tras advertir al comprador, el cliente repite la petición con `reemplazar_orden_id`. El servidor comprueba que siga siendo la misma orden activa y, en una transacción, libera la anterior y crea la nueva. Una orden con cobro en curso devuelve `409 PAGO_EN_PROCESO`.
+* **Vencimiento y cierre por función:** Los valores por defecto son 10 min desde el primer apartado, 5 min adicionales desde `expira_en` para el cobro web iniciado a tiempo, cierre web 30 min antes y cierre de taquilla al inicio. Se usan los parámetros vigentes de Configuración. Al intentar cobrar una orden `APARTADO` vencida se devuelve `409 ORDEN_EXPIRADA`; al alcanzar el cierre del canal se devuelve `409 VENTA_CERRADA` y se liberan los apartados pendientes de ese canal. Una orden web que ya inició el cobro puede concluir hasta `gracia_hasta`. Los pagos confirmados después de expirar siguen las transiciones T-3.7 y T-3.8 de ME-03.
+
+### **5.2. Cartelera e inventario por función**
+
+| Método y ruta | Actor y entrada | Respuesta y reglas |
+| :---- | :---- | :---- |
+| `GET cartelera/eventos/` | Consulta pública; filtros opcionales de fecha y categoría. | `200` paginado con los eventos publicados comerciales o públicos y sus funciones. Un filtro inválido devuelve `400`. |
+| `PUT cartelera/eventos/{id}/tarifario/` | Solicitante de su arrendamiento comercial pagado o `ADMIN`; configuración completa de `secciones_evento`, `fases_venta` y `precios`. | `200` con la configuración guardada. Cada butaca habilitada pertenece a una zona; cada par sección/fase tiene un precio ≥ $100.00. Se validan nombres únicos por evento, fases consecutivas, cobertura sin traslapes y geometría según alcance §2.3. Una configuración inválida devuelve `400`, una cuenta sin permiso `403` y un tarifario ya publicado `409 TARIFARIO_CONGELADO`. |
+| `PUT cartelera/eventos/{id}/poster/` | Solicitante de su arrendamiento pagado o `ADMIN` antes de publicar; archivo `poster` en `multipart/form-data`. | `200` con `poster_url`. Admite JPG, PNG o WebP de hasta 5 MB. |
+| `POST cartelera/eventos/{id}/publicar/` | `ADMIN`; evento comercial o público. | `200` con el evento en `PUBLICADO`. Requiere póster, pago inicial acreditado si es arrendamiento y tarifario completo si es comercial; ante requisitos pendientes devuelve `409` con el detalle. Congela zonas, fases y precios del evento comercial. |
+| `GET inventario/funciones/{id}/mapa/` | Lectura de una función comercial publicada. | `200` con `butacas` (id, sección física, fila, asiento, accesibilidad, habilitación y sección del evento), `fase_venta_id` y `precios` por sección del evento para esa fase. |
+| `GET inventario/funciones/{id}/disponibilidad/` | Misma función; sondeo cada 10–15 s con la vista activa y `If-None-Match` tras la primera consulta. | `200` con `fase_venta_id` y pares `butaca_id, estado`; `304` sin cuerpo cuando coincide el `ETag`. El identificador incluye fase y disponibilidad. Al cambiar de fase, aun con las mismas butacas libres, se devuelve `200` y el cliente recarga los precios del mapa. |
+
+En el tarifario, cada zona indica su nombre y delimitación (secciones oficiales completas, rangos rectangulares o cabinas completas según la modalidad). Cada fase indica su nombre e inicio; la primera cubre la apertura de venta. Cada entrada de precios vincula una zona y una fase con un importe. El guardado es atómico: si falta un precio o dos zonas se traslapan, se conserva la última configuración válida.
+
+El servidor limita la caché de la respuesta al menor plazo entre los 2–3 s previstos y el inicio de la siguiente fase, e invalida la disponibilidad al confirmar una modificación del inventario. El importe exigible es el devuelto por el apartado.
+
+### **5.3. Validación de boletos y contingencia**
+
+`POST boletos/validar/` admite sesión de `VERIFICADOR` o de `ADMIN` en soporte. Con cámara se envía `token`; si el operador seleccionó una función en la pantalla, se añade `funcion_id` como contexto de puerta. Con captura manual se envían `folio_corto` y `funcion_id` obligatoriamente. Se acepta una sola credencial por petición. La ventana de acceso siempre se calcula con el horario de la función del boleto. El orden de evaluación sigue ME-04, §5.2.
+
+| Resultado | HTTP y `code` | Mensaje en pantalla |
+| :---- | :---- | :---- |
+| Entrada o firma inválida | `400 BOLETO_INVALIDO` | Boleto no válido |
+| Boleto o folio inexistente | `404 BOLETO_NO_ENCONTRADO` | Boleto no válido |
+| Boleto invalidado o función/evento cancelado | `400 BOLETO_INVALIDO` | Boleto no válido |
+| Boleto usado previamente | `409 BOLETO_YA_USADO` | Ya ingresó a las HH:MM |
+| Función de puerta distinta a la del boleto | `409 OTRA_FUNCION` | Boleto de la función DD/MM HH:MM |
+| Antes de la ventana / después del fin | `422 ACCESO_ANTICIPADO` / `422 FUNCION_CONCLUIDA` | Abre a las HH:MM / La función ya terminó |
+| Boleto válido dentro de su ventana | `200 ACCESO_PERMITIDO` | Acceso permitido + sección, fila y asiento |
+
+Solo el último resultado registra el ingreso. Su JSON contiene `code, message, seccion, fila, asiento`; los errores usan el formato de §4. En contingencia, las siguientes operaciones son exclusivas de `ADMIN` y quedan auditadas:
+
+| Método y ruta | Entrada | Respuesta |
+| :---- | :---- | :---- |
+| `GET boletos/funciones/{id}/contingencia/listado/` | `formato=pdf` o `csv`, desde 24 h antes de la función. | `200` con PDF o CSV de boletos y cortesías vigentes. Las columnas son `folio_corto, seccion_subseccion, fila, asiento`; `seccion_subseccion` muestra la sección física y, cuando difiere, la zona comercial entre paréntesis, p. ej. **Luneta (General)**. Formato inválido: `400`; descarga anticipada: `409`. |
+| `POST boletos/funciones/{id}/contingencia/activar/` | Función comercial indicada en la ruta. | `200` con `modo_contingencia_activo: true`. |
+| `POST boletos/funciones/{id}/contingencia/reconciliar/` | Archivo CSV con columna única `folio_corto` o JSON con lista `folios`. | `200` con `aplicados, ya_usados, rechazados`. Procesa exclusivamente esa función, conserva los ingresos previos y cierra la contingencia en la misma transacción. |
+
+### **5.4. Usuarios, cotizaciones, agenda y configuración**
+
+| Método y ruta | Actor y entrada | Respuesta y reglas |
+| :---- | :---- | :---- |
+| `GET usuarios/csrf/` | Portal público o de gestión al iniciar. | `200` con cookie `csrftoken`; el cliente envía su valor en `X-CSRFToken` para escritura. |
+| `POST usuarios/registro/` | Visitante; `nombre, apellidos, correo, password` y aceptación del aviso y términos vigentes. | `201` con los datos de la cuenta creada y rol `USUARIO`. Datos o aceptación inválidos: `400`. |
+| `POST usuarios/login/` / `POST usuarios/logout/` | Inicio con `correo, password`; cierre con sesión activa. | Inicio: `200` con identidad y rol, y cookie de sesión `HttpOnly`; credenciales inválidas: `401`. Cierre: `200` y sesión revocada. |
+| `POST usuarios/recuperar-password/` | Visitante; `correo`. | `200` con el mismo mensaje de recepción para cualquier correo válido. Si corresponde a una cuenta, se envía el enlace de recuperación por SMTP. |
+| `GET usuarios/perfil/` / `PATCH usuarios/perfil/` | `USUARIO`; en edición, los campos propios que cambian (`nombre, apellidos, telefono`). | `200` con el perfil de la sesión. El rol y el propietario los determina el servidor. |
+| `GET configuracion/catalogos/` | Usuario autenticado que cotiza o `ADMIN`. | `200` con turnos, tarifas y servicios extra vigentes para el cálculo estimado. |
+| `PATCH configuracion/parametros/` | `ADMIN`; parámetros a modificar, por ejemplo `apartado_min` y `gracia_pago_min`. | `200` con la configuración resultante; `400` por valores inválidos. Las cotizaciones con importes y reglas ya fijados conservan su desglose. |
+| `POST cotizaciones/` | `USUARIO`; `nombre_evento, categoria_id, modalidad, contacto_nombre, contacto_telefono, contacto_correo, asistentes_estimados, es_multidia, bloques, extras` y póster opcional. | `201` con `cotizacion_id, estado: EN_REVISION` y desglose estimado. Más de 1,728 asistentes o bloques inválidos devuelven `400`. La recepción de la solicitud aún deja libre la agenda. |
+| `POST cotizaciones/{id}/aprobar/` | `ADMIN`; `monto_oficial` para una solicitud en revisión. | `200` con `estado: PRE_RESERVADO, monto_oficial, esquema_pago, monto_anticipo, saldo, pre_reserva_expira_en` y el vencimiento del saldo cuando aplique. Un traslape devuelve `409 CRUCE_AGENDA` sin aprobar parcialmente. |
+| `POST cotizaciones/{id}/alternativas/` | `ADMIN`; de una a tres opciones de fecha y turno libres y mutuamente disjuntas. | `200` con `estado: PROPUESTA_RETENIDA`, opciones y vencimiento. Cantidad inválida: `400`. Traslape: `409 CRUCE_AGENDA`. |
+| `POST cotizaciones/{id}/responder-alternativas/` | Solicitante propietario; aceptación con `opcion_id` o rechazo de todas. | `200` con `EN_REVISION` al aceptar (solo la elegida sigue retenida) o `PROPUESTA_EXPIRADA` al rechazar. Propuesta vencida: `409`. |
+| `GET agenda/bloqueos/` / `POST agenda/mantenimientos/` | `ADMIN`; consulta por intervalo, o alta con `inicio_en, fin_en` y motivo. | Consulta: `200` con ocupaciones. Alta: `201` con bloqueo confirmado; intervalo inválido: `400`; traslape: `409 CRUCE_AGENDA`. Dos bloques contiguos son compatibles porque el fin del intervalo es exclusivo. |
+
+En la aprobación se evalúa la **primera fecha reservada**, incluido el montaje. Con la configuración por defecto, a 30 días corresponde `100` y desde 31 días corresponde `50_50`. Django fija el esquema, el anticipo, el vencimiento de la pre-reserva (48 h por defecto) y, para parcialidades, el corte del saldo a las 23:59:59 de `D-21` en `America/Mexico_City`. Las fichas SPEI/efectivo se ofrecen solo para arrendamiento, con sus restricciones de plazo y monto (alcance §2.5). La confirmación de tarjeta o ficha entra por el webhook común de ventas y se despacha según `metadata.modulo`.
 
 # **Seguridad Aplicada**
 
