@@ -26,10 +26,10 @@ rectangle "Control de acceso y contingencia" {
 }
 
 V --> UC1
-V --> UC2
 A --> UC1
-A --> UC2
 A --> UC3
 A --> UC4
 A --> UC5
+
+UC1 <.. UC2 : <<extend>>
 @enduml

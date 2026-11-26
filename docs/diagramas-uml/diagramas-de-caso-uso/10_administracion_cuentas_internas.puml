@@ -1,0 +1,24 @@
+@startuml 10_administracion_cuentas_internas
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Administrador" as A
+
+rectangle "Administración de cuentas internas" {
+  usecase "Gestionar usuarios" as UC1
+}
+
+A --> UC1
+@enduml

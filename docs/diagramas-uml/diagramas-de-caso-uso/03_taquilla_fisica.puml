@@ -25,12 +25,15 @@ rectangle "Taquilla física" {
   usecase "Registrar método de\npago" as UC5
   usecase "Emitir e imprimir boletos" as UC6
   usecase "Cancelar operación de\ntaquilla" as UC7
-  usecase "Reimprimir boletos\nmediante número de\norden" as UC8
+  usecase "Consultar carrito" as UC8
+  usecase "Reimprimir boletos\nmediante número de\norden" as UC9
 }
 
 C --> UC1
 C --> UC8
-A --> UC8
+C --> UC9
+A --> UC9
+
 UC1 ..> UC2 : <<include>>
 UC1 ..> UC3 : <<include>>
 UC1 ..> UC4 : <<include>>

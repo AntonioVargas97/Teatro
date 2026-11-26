@@ -18,21 +18,24 @@ actor "Administrador" as A
 
 rectangle "Cotización y seguimiento de arrendamiento" {
   usecase "Consultar calendario de\ndisponibilidad" as UC1
-  usecase "Registrar bloqueos de\nagenda" as UC2
-  usecase "Revisar solicitudes de\ncotización" as UC3
-  usecase "Aprobar cotización" as UC4
-  usecase "Rechazar solicitud de\ncotización" as UC5
-  usecase "Proponer fechas\nalternativas" as UC6
-  usecase "Realizar pago de\narrendamiento" as UC7
-  usecase "Resolver pago\nextemporáneo" as UC8
+  usecase "Gestionar solicitudes de\ncotización" as UC2
+  usecase "Aprobar cotización" as UC3
+  usecase "Rechazar solicitud de\ncotización" as UC4
+  usecase "Proponer fechas\nalternativas" as UC5
+  usecase "Resolver pago\nextemporáneo" as UC6
+  usecase "Cancelar arrendamiento" as UC7
+  usecase "Registrar bloqueos de agenda\nde mantenimiento" as UC8
+  usecase "Liberar bloqueos de agenda\nde mantenimiento" as UC9
 }
 
 A --> UC1
 A --> UC2
-A --> UC3
+A --> UC6
 A --> UC7
 A --> UC8
-UC3 <.. UC4 : <<extend>>
-UC3 <.. UC5 : <<extend>>
-UC3 <.. UC6 : <<extend>>
+A --> UC9
+
+UC2 <.. UC3 : <<extend>>
+UC2 <.. UC4 : <<extend>>
+UC2 <.. UC5 : <<extend>>
 @enduml

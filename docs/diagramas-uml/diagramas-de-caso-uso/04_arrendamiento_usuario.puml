@@ -24,19 +24,24 @@ rectangle "Cotización y seguimiento de arrendamiento" {
   usecase "Aceptar fecha alternativa" as UC5
   usecase "Rechazar fecha\nalternativa" as UC6
   usecase "Realizar pago de\narrendamiento" as UC7
-  usecase "Pagar con tarjeta en línea" as UC8
-  usecase "Solicitar cancelación de\narrendamiento" as UC9
-  usecase "Solicitar reprogramación\nde arrendamiento" as UC10
+  usecase "Método de pago" as UC8
+  usecase "Ficha de pago" as UC9
+  usecase "Pago con tarjeta" as UC10
+  usecase "Solicitar cancelación de\narrendamiento" as UC11
+  usecase "Solicitar reprogramación\nde arrendamiento" as UC12
 }
 
 U --> UC1
 U --> UC3
 U --> UC4
 U --> UC7
-U --> UC9
-U --> UC10
+U --> UC11
+U --> UC12
+
 UC1 ..> UC2 : <<include>>
 UC4 <.. UC5 : <<extend>>
 UC4 <.. UC6 : <<extend>>
-UC7 <.. UC8 : <<extend>>
+UC7 ..> UC8 : <<include>>
+UC8 <|-- UC9
+UC8 <|-- UC10
 @enduml

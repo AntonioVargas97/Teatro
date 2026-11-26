@@ -19,8 +19,12 @@ actor "Administrador" as A
 rectangle "Supervisión de ventas y cuentas internas" {
   usecase "Consultar ventas globales y\ncancelaciones auditadas" as UC1
   usecase "Administrar cuentas internas" as UC2
+  usecase "Registrar anulación\nauditada de orden" as UC3
+  usecase "Consultar bitácora global\nde auditoría" as UC4
 }
 
 A --> UC1
 A --> UC2
+A --> UC3
+A --> UC4
 @enduml

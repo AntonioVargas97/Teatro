@@ -28,6 +28,7 @@ rectangle "Venta de boletos en línea" {
 
 U --> UC1
 U --> UC6
+
 UC1 ..> UC2 : <<include>>
 UC1 ..> UC3 : <<include>>
 UC1 ..> UC4 : <<include>>

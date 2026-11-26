@@ -19,26 +19,33 @@ actor "Usuario estándar" as U
 
 rectangle "Portal público y gestión de cuentas" {
   usecase "Registrarse" as UC1
-  usecase "Iniciar sesión" as UC2
-  usecase "Recuperar contraseña\npor correo" as UC3
-  usecase "Consultar cartelera" as UC4
-  usecase "Filtrar cartelera por fecha\ny categoría" as UC5
-  usecase "Consultar información de\nun evento" as UC6
-  usecase "Consultar mapa de\ndisponibilidad de asientos" as UC7
-  usecase "Gestionar perfil personal" as UC8
+  usecase "Consultar aviso de privacidad\ny términos de servicio" as UC2
+  usecase "Iniciar sesión" as UC3
+  usecase "Cerrar sesión" as UC4
+  usecase "Recuperar contraseña\npor correo" as UC5
+  usecase "Confirmar restablecimiento\nde contraseña" as UC6
+  usecase "Consultar cartelera" as UC7
+  usecase "Filtrar cartelera por fecha\ny categoría" as UC8
+  usecase "Consultar información de\nun evento" as UC9
+  usecase "Consultar mapa de\ndisponibilidad de asientos" as UC10
+  usecase "Gestionar perfil personal" as UC11
 }
 
 V --> UC1
-V --> UC4
-V --> UC6
 V --> UC7
-U --> UC2
+V --> UC9
+V --> UC10
 U --> UC3
 U --> UC4
-U --> UC6
+U --> UC5
 U --> UC7
-U --> UC8
-UC4 <.. UC5 : <<extend>>
+U --> UC9
+U --> UC10
+U --> UC11
+
+UC1 ..> UC2 : <<include>>
+UC5 ..> UC6 : <<include>>
+UC7 <.. UC8 : <<extend>>
 @enduml
 @startuml 02_venta_boletos_en_linea
 skinparam shadowing false
@@ -70,6 +77,7 @@ rectangle "Venta de boletos en línea" {
 
 U --> UC1
 U --> UC6
+
 UC1 ..> UC2 : <<include>>
 UC1 ..> UC3 : <<include>>
 UC1 ..> UC4 : <<include>>
@@ -103,12 +111,15 @@ rectangle "Taquilla física" {
   usecase "Registrar método de\npago" as UC5
   usecase "Emitir e imprimir boletos" as UC6
   usecase "Cancelar operación de\ntaquilla" as UC7
-  usecase "Reimprimir boletos\nmediante número de\norden" as UC8
+  usecase "Consultar carrito" as UC8
+  usecase "Reimprimir boletos\nmediante número de\norden" as UC9
 }
 
 C --> UC1
 C --> UC8
-A --> UC8
+C --> UC9
+A --> UC9
+
 UC1 ..> UC2 : <<include>>
 UC1 ..> UC3 : <<include>>
 UC1 ..> UC4 : <<include>>
@@ -142,21 +153,26 @@ rectangle "Cotización y seguimiento de arrendamiento" {
   usecase "Aceptar fecha alternativa" as UC5
   usecase "Rechazar fecha\nalternativa" as UC6
   usecase "Realizar pago de\narrendamiento" as UC7
-  usecase "Pagar con tarjeta en línea" as UC8
-  usecase "Solicitar cancelación de\narrendamiento" as UC9
-  usecase "Solicitar reprogramación\nde arrendamiento" as UC10
+  usecase "Método de pago" as UC8
+  usecase "Ficha de pago" as UC9
+  usecase "Pago con tarjeta" as UC10
+  usecase "Solicitar cancelación de\narrendamiento" as UC11
+  usecase "Solicitar reprogramación\nde arrendamiento" as UC12
 }
 
 U --> UC1
 U --> UC3
 U --> UC4
 U --> UC7
-U --> UC9
-U --> UC10
+U --> UC11
+U --> UC12
+
 UC1 ..> UC2 : <<include>>
 UC4 <.. UC5 : <<extend>>
 UC4 <.. UC6 : <<extend>>
-UC7 <.. UC8 : <<extend>>
+UC7 ..> UC8 : <<include>>
+UC8 <|-- UC9
+UC8 <|-- UC10
 @enduml
 @startuml 05_arrendamiento_administrador
 skinparam shadowing false
@@ -178,23 +194,26 @@ actor "Administrador" as A
 
 rectangle "Cotización y seguimiento de arrendamiento" {
   usecase "Consultar calendario de\ndisponibilidad" as UC1
-  usecase "Registrar bloqueos de\nagenda" as UC2
-  usecase "Revisar solicitudes de\ncotización" as UC3
-  usecase "Aprobar cotización" as UC4
-  usecase "Rechazar solicitud de\ncotización" as UC5
-  usecase "Proponer fechas\nalternativas" as UC6
-  usecase "Realizar pago de\narrendamiento" as UC7
-  usecase "Resolver pago\nextemporáneo" as UC8
+  usecase "Gestionar solicitudes de\ncotización" as UC2
+  usecase "Aprobar cotización" as UC3
+  usecase "Rechazar solicitud de\ncotización" as UC4
+  usecase "Proponer fechas\nalternativas" as UC5
+  usecase "Resolver pago\nextemporáneo" as UC6
+  usecase "Cancelar arrendamiento" as UC7
+  usecase "Registrar bloqueos de agenda\nde mantenimiento" as UC8
+  usecase "Liberar bloqueos de agenda\nde mantenimiento" as UC9
 }
 
 A --> UC1
 A --> UC2
-A --> UC3
+A --> UC6
 A --> UC7
 A --> UC8
-UC3 <.. UC4 : <<extend>>
-UC3 <.. UC5 : <<extend>>
-UC3 <.. UC6 : <<extend>>
+A --> UC9
+
+UC2 <.. UC3 : <<extend>>
+UC2 <.. UC4 : <<extend>>
+UC2 <.. UC5 : <<extend>>
 @enduml
 @startuml 06_eventos_tarifas_y_publicacion
 skinparam shadowing false
@@ -217,15 +236,19 @@ actor "Usuario estándar" as U
 
 rectangle "Gestión de eventos, tarifas y publicación" {
   usecase "Registrar evento directo" as UC1
-  usecase "Resolver evento\npendiente de publicación" as UC2
-  usecase "Administrar funciones del\nevento" as UC3
-  usecase "Cargar / actualizar póster\npublicitario" as UC4
-  usecase "Publicar evento" as UC5
-  usecase "Configurar secciones,\nsubsecciones y tarifas" as UC6
-  usecase "Emitir cortesías" as UC7
-  usecase "Bloquear localidad por\nmotivos técnicos" as UC8
-  usecase "Reprogramar evento" as UC9
-  usecase "Cancelar evento" as UC10
+  usecase "Consultar datos de evento" as UC2
+  usecase "Editar datos de evento" as UC3
+  usecase "Administrar funciones del\nevento" as UC4
+  usecase "Reprogramar función de\nevento" as UC5
+  usecase "Reprogramar evento" as UC6
+  usecase "Cancelar evento" as UC7
+  usecase "Publicar evento" as UC8
+  usecase "Cargar / actualizar póster\npublicitario" as UC9
+  usecase "Configurar secciones, secciones\nde evento y tarifas" as UC10
+  usecase "Emitir cortesías" as UC11
+  usecase "Revocar cortesías" as UC12
+  usecase "Bloquear localidad por\nmotivos técnicos" as UC13
+  usecase "Retirar bloqueo técnico" as UC14
 }
 
 A --> UC1
@@ -238,8 +261,12 @@ A --> UC7
 A --> UC8
 A --> UC9
 A --> UC10
-U --> UC4
-U --> UC6
+A --> UC11
+A --> UC12
+A --> UC13
+A --> UC14
+U --> UC9
+U --> UC10
 @enduml
 @startuml 07_control_acceso_y_contingencia
 skinparam shadowing false
@@ -269,12 +296,12 @@ rectangle "Control de acceso y contingencia" {
 }
 
 V --> UC1
-V --> UC2
 A --> UC1
-A --> UC2
 A --> UC3
 A --> UC4
 A --> UC5
+
+UC1 <.. UC2 : <<extend>>
 @enduml
 @startuml 08_configuracion_administrativa
 skinparam shadowing false
@@ -329,8 +356,36 @@ actor "Administrador" as A
 rectangle "Supervisión de ventas y cuentas internas" {
   usecase "Consultar ventas globales y\ncancelaciones auditadas" as UC1
   usecase "Administrar cuentas internas" as UC2
+  usecase "Registrar anulación\nauditada de orden" as UC3
+  usecase "Consultar bitácora global\nde auditoría" as UC4
 }
 
 A --> UC1
 A --> UC2
+A --> UC3
+A --> UC4
+@enduml
+@startuml 10_administracion_cuentas_internas
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam ArrowColor #333333
+left to right direction
+actor "Administrador" as A
+
+rectangle "Administración de cuentas internas" {
+  usecase "Gestionar usuarios" as UC1
+}
+
+A --> UC1
 @enduml
