@@ -20,3 +20,6 @@ Este repositorio usa skills complementarias bajo `.agents/skills/`. Cuando dos g
    - Todo diagrama de clases en PlantUML vive en `docs/diagramas-uml/` y sigue UML 2.5.1 con relaciones sin cruces, verificado con `scripts/check_crossings.py`. Se construye solo con lo definido en las fuentes de verdad (`docs/arquitectura.md`, `docs/alcance.md`, `docs/maquinas-de-estado.md`).
    - Diagramas de robustez (`plantuml-diagrama-robustez`): `docs/diagramas-uml/diagramas-de-robustez/RBNN_*.puml`, reglas ICONIX sustantivo–verbo verificadas con `scripts/check_robustness.py`.
    - Diagramas de secuencia (`plantuml-diagrama-secuencia`): `docs/diagramas-uml/diagramas-de-secuencia/SDNN_*.puml`, UML 2.5.1 con lifelines del diagrama de robustez del mismo `NN`, verificados con `scripts/check_sequence.py`. Orden de trabajo: casos de uso → robustez → secuencia.
+7. **Ingeniería de Requisitos (`ooad-generador-requisitos`):**
+   - Opera en 3 modos independientes (`Solo RF`, `Solo RNF` bajo ISO/IEC 25010 y `Especificación Completa` generando **dos archivos separados**). Bajo ambigüedad, pregunta siempre el modo antes de generar.
+   - Por excepción exclusiva de esa skill, guarda automáticamente los archivos en `./docs/requisitos/` (`requisitos-funcionales.md` y `requisitos-no-funcionales.md`), creando las carpetas si no existen.

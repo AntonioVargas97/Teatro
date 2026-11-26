@@ -24,6 +24,7 @@ Consulta y aplica la guía correspondiente según el área de trabajo (ver detal
 * **Control de versiones:** `git-workflow` (Conventional Commits, commits atómicos). Mientras siga la etapa inicial sobre `main`, preguntar antes de commitear directo en `main` salvo indicación explícita.
 * **Diagramas de clases UML:** `plantuml-diagrama-clases` (PlantUML en `docs/diagramas-uml/`, UML 2.5.1, relaciones sin cruces verificadas con `check_crossings.py`, solo con entidades y estados definidos en las fuentes de verdad).
 * **Diagramas de robustez y secuencia:** `plantuml-diagrama-robustez` (ICONIX, `docs/diagramas-uml/diagramas-de-robustez/`, `check_robustness.py`) y `plantuml-diagrama-secuencia` (UML 2.5.1, `docs/diagramas-uml/diagramas-de-secuencia/`, `check_sequence.py`), derivados de los diagramas de casos de uso y de las fuentes de verdad.
+* **Ingeniería de requisitos:** `ooad-generador-requisitos` (3 modos: `RF`, `RNF` ISO/IEC 25010 y `Especificación Completa` en dos archivos independientes bajo `docs/requisitos/`, preguntando siempre al usuario si existe ambigüedad).
 * **Auditorías:** Regla condicional `.agents/rules/auditorias-docs.md` (reportes inmutables *append-only* en `docs/reportes/<tipo-auditoria>/auditoria-[nombreDescriptivo]-[fecha].md`).
 
 ## 3. Reglas Operativas Siempre Activas

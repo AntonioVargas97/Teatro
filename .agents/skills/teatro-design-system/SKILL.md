@@ -57,4 +57,4 @@ Antes de dar por terminada cualquier pantalla o componente migrado:
 3. **Contraste y tamaño mínimo:** ¿Todos los textos funcionales, badges, encabezados de tabla e inputs son `>= 12px` (`text-xs`) y cumplen WCAG AA/AAA (tinta `#0F172A` sobre `#E58E26` en Admin/Puerta, `#B45309` para texto ámbar sobre claro)?
 4. **Arquitectura operativa correcta:** Si es Admin, ¿usa la barra de 4 pilares + sub-barra Arena y mesa **Split `7+5` con inspector fijo** en lugar de modales repetitivos? Si es Verificador, ¿coloca la tarjeta de veredicto por encima de la cámara/entrada manual y deja cualquier simulador debajo?
 5. **Iconografía y accesibilidad:** ¿Se usan íconos SVG consistentes en lugar de emojis de sistema en la interfaz (reservando únicamente `♿` para localidades accesibles en el plano)?
-6. **Responsive sin desbordamiento:** Verifica `390px` (móvil) y `1280px` (escritorio) sin `scrollWidth > innerWidth` ni columnas recortadas.
+6. **Responsive sin desbordamiento:** Verifica `360px` (móvil) y `1280px` (escritorio) sin `scrollWidth > innerWidth` ni columnas recortadas.
