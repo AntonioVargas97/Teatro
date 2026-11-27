@@ -19,7 +19,7 @@
 
 * **El "qué":** Define los estados finitos, eventos disparadores, condiciones guarda y efectos secundarios de las cuatro entidades transaccionales críticas del sistema (**Cotización/Arrendamiento**, **Evento/Función**, **OrdenCompra** y **DisponibilidadButaca/Boleto QR**), junto con los mecanismos para resolver condiciones de carrera (*race conditions*).
 * **El "cómo":** Ningún controlador HTTP (`ViewSet`), tarea de Celery ni *webhook* de Stripe puede modificar directamente el campo `estado` mediante asignaciones crudas (`obj.estado = ...`). Toda transición debe invocarse a través de métodos explícitos en la capa de servicios (`services.py` / *Domain Services*) dentro de bloques transaccionales atómicos (`transaction.atomic()`), registrando cada cambio sensible en la bitácora inmutable de auditoría (`AuditoriaService`).
-* **El "por qué" (Prevención de deuda técnica):** Desacopla las reglas temporales y de pago de la interfaz web y evita que procesos concurrentes (dos compradores, el reloj de expiración de Celery Beat y notificaciones asíncronas de Stripe) corrompan el inventario de 1,728 butacas o provoquen dobles reservas de agenda.
+* **El "por qué" (Prevención de deuda técnica):** Desacopla las reglas temporales y de pago de la interfaz web y evita que procesos concurrentes (dos compradores, el reloj de expiración de Celery Beat y notificaciones asíncronas de Stripe) corrompan el inventario de 1,730 butacas o provoquen dobles reservas de agenda.
 
 ## **2. ME-01 — Máquina de Estados de Cotización y Arrendamiento**
 
@@ -51,7 +51,9 @@
 | **T-1.13** | `CONFIRMADO` | `acreditar_saldo_50` | `esquema == 50/50`, `now() <= D-21 23:59:59` (sin fichas en últimas 48 h). | `CONFIRMADO` | Registra `pago_arrendamiento` `EXITOSO` sobre la cuota `SALDO_50` (cuota `PAGADA`; el estado financiero pasa a `LIQUIDADO_100`) y audita el pago. |
 | **T-1.14** | `CONFIRMADO` | `reprogramar` | Nueva fecha libre; si pide cliente: `>= 21 d` y 1ra vez gratis (si queda `< 21 d` con `ANTICIPO_50_PAGADO`, exige liquidar 100% previo). | `CONFIRMADO` | Operación atómica en `AgendaService` (libera bloque previo y crea nuevo), recalcula `D-21` y `fecha_limite_publicacion`, conserva boletos, registra `reprogramacion_funcion` y marca `REPROGRAMADO` en `Función`. |
 | **T-1.15** | `CONFIRMADO` | `cancelar_arrendatario` / `incumplir_saldo_d21` | Solicitud cliente + Admin, o `50/50` sin saldo tras `D-21 23:59:59`. | `CANCELADO_POR_ARRENDATARIO` | Registra `cancelacion_arrendamiento` (`POR_ARRENDATARIO` o `INCUMPLIMIENTO_D21`) y calcula `monto_retenido` (50% si pagó 100% y `>= 21 d`; 0% reembolso si `< 21 d` o solo anticipo), detiene venta, invalida QRs, conserva historial; agenda se libera solo por acción explícita de Admin. Si llega 2do 50% tardío post `D-21`, devuelve 100% (Stripe o `REEMBOLSO_BANCARIO_PENDIENTE`). |
-| **T-1.16** | `CONFIRMADO` | `cancelar_teatro` | Admin declara cancelación por Teatro o fuerza mayor. | `CANCELADO_POR_TEATRO` | Registra `cancelacion_arrendamiento` (`POR_TEATRO`); 100% reembolso externo o reprogramación sin costo; detiene venta, invalida QRs y conserva padrón para devoluciones manuales. |
+| **T-1.16a** | `CONFIRMADO` | `cancelar_teatro_reembolso` | Admin declara cancelación por Teatro o fuerza mayor y solicitante elige reembolso. | `CANCELADO_POR_TEATRO` | Registra `cancelacion_arrendamiento` (`POR_TEATRO`); 100% reembolso externo; detiene venta, invalida QRs y conserva padrón para devoluciones manuales. |
+| **T-1.16b** | `CONFIRMADO` / `CANCELADO_POR_TEATRO` | `solicitar_reprogramacion_teatro` | Solicitante elige opción de reprogramación sin costo tras cancelación por Teatro (`POST eleccion-cancelacion/`). | `CANCELADA_REPROGRAMABLE` | Conserva el saldo acreditado del arrendatario sin penalización y habilita la selección de nueva fecha libre. |
+| **T-1.16c** | `CANCELADA_REPROGRAMABLE` | `asignar_nueva_fecha_teatro` | Admin asigna nueva fecha/turno libre en agenda. | `CONFIRMADO` | Reasigna atómicamente el `BloqueoAgenda` sin cobro adicional, recalcula `fecha_limite_publicacion` y reactiva el ciclo operativo. |
 | **T-1.17** | `CONFIRMADO` | `finalizar_arrendamiento` | Concluyen todas las fechas/funciones del evento. | `FINALIZADO` | Cierra ciclo operativo del arrendamiento. |
 
 ## **3. ME-02 — Máquina de Estados de Evento y Función**
@@ -73,7 +75,8 @@
 | **T-2.2** | Evento | `[*]` | Arrendamiento `CONFIRMADO` o Evento Directo en modalidad `Privado`. | `OPERACION_SIN_CARTELERA` | Exento de póster, tarifas y cartelera pública; mantiene bloqueo en agenda. |
 | **T-2.3** | Evento | `PENDIENTE_PUBLICACION` | Póster cargado (+ tarifas `>= $100.00 MXN` si `Comercial`) + aprobación final de `ADMIN` (`<= fecha_limite_publicacion`). | `PUBLICADO` | Visible en cartelera; si es `Comercial`, congela secciones del evento, fases de venta y tarifas y ejecuta `bulk_create` de `DisponibilidadButaca` por función, solo para las butacas con `asignacion_butaca`. |
 | **T-2.4** | Evento | `PENDIENTE_PUBLICACION` | `now() > fecha_limite_publicacion` sin requisitos completos (`Celery Beat`). | `VENCIDO_SIN_PUBLICAR` | Mantiene bloqueo en agenda (nunca libera automático) y exige resolución auditada del `ADMIN`. |
-| **T-2.5** | Evento | `VENCIDO_SIN_PUBLICAR` | Admin apoya capturando póster/tarifas (opción 1) o concede prórroga (opción 2) y aprueba. | `PUBLICADO` | Publica evento y materializa `DisponibilidadButaca` si es `Comercial`. |
+| **T-2.5a** | Evento | `VENCIDO_SIN_PUBLICAR` | Admin apoya capturando póster/tarifas (opción 1) y aprueba publicación. | `PUBLICADO` | Publica evento y materializa `DisponibilidadButaca` si es `Comercial`. |
+| **T-2.5b** | Evento | `VENCIDO_SIN_PUBLICAR` | Admin concede prórroga al solicitante (opción 2). | `PENDIENTE_PUBLICACION` | Actualiza determinísticamente `fecha_limite_publicacion` y reanuda recordatorios. |
 | **T-2.6** | Evento | `VENCIDO_SIN_PUBLICAR` | Admin autoriza operar sin venta web ni cartelera (opción 3). | `OPERACION_SIN_CARTELERA` | Conserva bloqueo en agenda para operación presencial sin venta en línea. |
 | **T-2.7** | Evento | `VENCIDO_SIN_PUBLICAR` / `PENDIENTE_PUBLICACION` / `PUBLICADO` / `OPERACION_SIN_CARTELERA` | Admin registra cancelación (opción 4, arrendatario, D-21 o Teatro). | `CANCELADO_POR_ARRENDATARIO` / `CANCELADO_POR_TEATRO` | Detiene venta, invalida QRs emitidos, conserva historial; libera agenda explícitamente (o sin retención en Directos). |
 | **T-2.8** | Evento | `PUBLICADO` / `OPERACION_SIN_CARTELERA` | Todas sus `Funciones` alcanzan `CONCLUIDA`. | `FINALIZADO` | Cierra ciclo de cartelera/operación del evento. |
@@ -84,7 +87,7 @@
 
 ### **4.1 Reglas de Diseño**
 
-* **Un solo carrito activo por usuario (`5` estados oficiales):** `OrdenCompra` maneja exclusivamente los estados `APARTADO`, `PAGO_EN_PROCESO`, `PAGADA`, `EXPIRADA` y `REEMBOLSADA_AUTOMATICA`. Al seleccionar la primera butaca disponible se crea la orden en `APARTADO` y arranca un reloj único de 10 minutos (`expira_en`; agregar más butacas dentro de `<= 10` no reinicia el reloj). En línea exige cuenta `USUARIO`; en taquilla (`CAJERO`) opera sin cuenta de comprador hasta `inicio_en` (`0 min`).
+* **Un solo carrito activo por usuario (`6` estados oficiales):** `OrdenCompra` maneja exclusivamente los estados `APARTADO`, `PAGO_EN_PROCESO`, `PAGADA`, `EXPIRADA`, `REEMBOLSADA_AUTOMATICA` y `ANULADA`. Al seleccionar la primera butaca disponible se crea la orden en `APARTADO` y arranca un reloj único de 10 minutos (`expira_en`; agregar más butacas dentro de `<= 10` no reinicia el reloj). En línea exige cuenta `USUARIO`; en taquilla (`CAJERO`) opera sin cuenta de comprador hasta `inicio_en` (`0 min`).
 * **Cierres independientes y pagos tardíos:** Al llegar el cierre web (`inicio_en - 30 min`), las órdenes aún en `APARTADO` no pueden iniciar `checkout` y expiran; solo continúan en gracia (`gracia_hasta = +5 min`) las ya en `PAGO_EN_PROCESO`. Si un *webhook* `payment_intent.succeeded` llega tras pasar a `EXPIRADA`, bajo el candado global `Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> OrdenCompraDetalle -> Boleto` se verifica que la función siga vigente (`now() <= fin_en`, no cancelada), que el 100% de las butacas sigan `DISPONIBLE` y que reasignar no supere `<= 10` boletos acumulados (`APARTADO + PAGO_EN_PROCESO + PAGADA`); de lo contrario, se ejecuta reembolso automático del 100% (`REEMBOLSADA_AUTOMATICA`). Ante cancelación del evento, `OrdenCompra` permanece en `PAGADA` para respaldo contable.
 
 ### **4.2 Diagrama de Estados (PlantUML)**
@@ -103,6 +106,7 @@
 | **T-3.6** | `APARTADO` / `PAGO_EN_PROCESO` | `expirar_o_cancelar_orden` | `now() > limite_vigencia` (10 min o `gracia_hasta`), cierre web `-30m` sobre `APARTADO`, carrito vaciado o Cajero cancela. | `EXPIRADA` | Libera butacas a `DISPONIBLE` y cancela `PaymentIntent` en Stripe si existía. |
 | **T-3.7** | `EXPIRADA` | `webhook_tardio_valido` | `payment_intent.succeeded` tardío, `now() <= fin_en`, función no cancelada, 100% butacas `DISPONIBLE` y suma acumulada `<= 10`. | `PAGADA` | Bloquea `Usuario -> OrdenCompra -> DisponibilidadButaca (funcion_id, butaca_id ASC) -> OrdenCompraDetalle -> Boleto`, pasa butacas a `VENDIDA`, emite boletos QR y envía correo. |
 | **T-3.8** | `EXPIRADA` | `webhook_tardio_rechazado` | `payment_intent.succeeded` tardío y (`>= 1` butaca no `DISPONIBLE` o suma `> 10` o función cerrada/cancelada). | `REEMBOLSADA_AUTOMATICA` | Ejecuta `stripe.Refund.create()` por el 100% del monto, audita y notifica por correo. |
+| **T-3.9** | `PAGADA` | `anular_orden_taquilla` | Rol `ADMIN`, canal `TAQUILLA`, 0 boletos usados (`USADO`/`USADO_CONTINGENCIA`) y `now() <= funcion.fin_en`. | `ANULADA` | Bloquea bajo candados globales, cambia `orden_compra` a `ANULADA`, invalida boletos (`INVALIDADO`), desactiva detalle (`activo=False`), libera butacas a `DISPONIBLE` para reventa limpia y registra auditoría inmutable. El reembolso monetario se liquida presencialmente en ventanilla (efectivo/terminal). |
 
 ## **5. ME-04 — Máquina de Estados de `DisponibilidadButaca` y Boleto QR**
 
@@ -112,7 +116,7 @@
 
 | ID | Entidad | Estado Origen | Disparador / Guarda | Estado Destino | Efectos Secundarios |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **T-4.1** | `DisponibilidadButaca` | `[*]` | Evento `Comercial` pasa a `PUBLICADO` (o nueva función añadida). | `DISPONIBLE` | `bulk_create` por cada función, solo con filas de las butacas que tienen sección del evento (`asignacion_butaca`; pueden ser menos de 1,728). |
+| **T-4.1** | `DisponibilidadButaca` | `[*]` | Evento `Comercial` pasa a `PUBLICADO` (o nueva función añadida). | `DISPONIBLE` | `bulk_create` por cada función, solo con filas de las butacas que tienen sección del evento (`asignacion_butaca`; pueden ser menos de 1,730). |
 | **T-4.2** | `DisponibilidadButaca` | `DISPONIBLE` | Selección en Web o Taquilla (`OrdenCompra` `APARTADO`). | `APARTADA` | Enlaza a `OrdenCompra` con `expira_en`. |
 | **T-4.3** | `DisponibilidadButaca` | `APARTADA` | `OrdenCompra` `EXPIRADA` o `PAGADA`. | `DISPONIBLE` / `VENDIDA` | Libera o consolida venta y emite `Boleto` en `EMITIDO`. |
 | **T-4.4** | `DisponibilidadButaca` | `DISPONIBLE` <-> `BLOQUEO_TECNICO` | `ADMIN` aplica o retira bloqueo técnico previo al cierre de taquilla. | `BLOQUEO_TECNICO` / `DISPONIBLE` | Inhabilita o restaura localidad sin emitir boleto ni QR; registra una fila en `bloqueo_tecnico` (historial) y audita. |
@@ -254,7 +258,7 @@ class OrdenCompraService:
 | Propuestas de fecha (T-1.1) | Sin registro del motivo | `propuesta_fecha` con `motivo` y `opcion_propuesta` |
 | Expiraciones de cotización | `pre_reserva_expira_en`, `propuesta_expira_en`, `revision_extemporanea_expira_en` | `bloqueo_agenda.expira_en`, `propuesta_fecha.expira_en`, `revision_pago_extemporaneo.expira_en` |
 | Cuota de cierre | `LIQUIDACION_100` | `TOTAL_100` (tipo de `cuota_arrendamiento`) |
-| Inventario por función (T-2.3, T-4.1) | `bulk_create(..., batch_size=1728)` | `bulk_create` solo para butacas con `asignacion_butaca` (pueden ser menos de 1,728) |
+| Inventario por función (T-2.3, T-4.1) | `bulk_create(..., batch_size=1730)` | `bulk_create` solo para butacas con `asignacion_butaca` (pueden ser menos de 1,730) |
 | Reprogramación de función (T-2.9) | `inicio_en_anterior` / `fin_en_anterior` en la función | Fila en `reprogramacion_funcion` (`inicio_anterior`, `fin_anterior`, bloqueos anterior y nuevo) |
 | Bloqueo técnico (T-4.4) | Sin historial | Fila en `bloqueo_tecnico` |
 | Contingencia (T-4.8, ME-04) | Modo contingencia (bandera) | Registro `contingencia_funcion` cerrado por reconciliación (`aplicados`, `ya_usados`, `rechazados`) |

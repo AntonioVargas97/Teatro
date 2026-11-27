@@ -1,4 +1,5 @@
 @startuml SD05_arrendamiento_administrador
+' Alineado con BD v6.2 y Contrato API v1
 skinparam shadowing false
 skinparam sequenceMessageAlign left
 skinparam responseMessageBelowArrow true
@@ -102,7 +103,7 @@ else [decision == RECHAZAR o colisión de agenda]
   opt [pago fue con tarjeta]
     COT_CTL -> ST : ejecutar reembolso técnico 100%
   end
-  note right of COT_CTL : Si fue ficha SPEI/efectivo queda en REEMBOLSO_BANCARIO_PENDIENTE\npara cierre manual con confirmar-reembolso-bancario/
+  note right of COT_CTL : Si fue ficha FICHA_SPEI/efectivo queda en REEMBOLSO_BANCARIO_PENDIENTE\npara cierre manual con confirmar-reembolso-bancario/
 end
 COT_CTL -> AUD_CTL : auditar resolución
 AUD_CTL -> E_AUD : insertar registro

@@ -6,7 +6,7 @@
   </defs>
   <g id="map-world">
 
-    <!-- CAPA 1: 6 SECCIONES OFICIALES DEL RECINTO (1,728 BUTACAS) -->
+    <!-- CAPA 1: 6 SECCIONES OFICIALES DEL RECINTO (1,730 BUTACAS) -->
     <g id="layer-zone-blocks">
       <!-- 1. SEGUNDO PISO (386 butacas) -->
       <g class="map-zone cursor-pointer" data-zone="segundo-piso">
@@ -47,12 +47,12 @@
         </g>
       </g>
 
-      <!-- 5. LUNETA (564 butacas) -->
+      <!-- 5. LUNETA (566 butacas) -->
       <g class="map-zone cursor-pointer" data-zone="luneta">
         <path class="zone-shape transition-all duration-200" d="M 272 514 L 828 514 L 814 812 L 286 812 Z" fill="#DC2626" stroke="#FFFFFF" stroke-width="3" />
         <g class="zone-label">
           <text x="550" y="652" text-anchor="middle" fill="#FFFFFF" font-size="26" font-weight="900">LUNETA</text>
-          <text class="zone-sublabel" x="550" y="678" text-anchor="middle" fill="#FEE2E2" font-size="15" font-weight="600">564 butacas · $650 MXN</text>
+          <text class="zone-sublabel" x="550" y="678" text-anchor="middle" fill="#FEE2E2" font-size="15" font-weight="600">566 butacas · $650 MXN</text>
         </g>
       </g>
 
@@ -92,7 +92,7 @@
     <!-- CAPA 1B: SUPERPOSICIÓN DE SECCIONES DESHABILITADAS -->
     <g id="layer-disabled-overlays" class="pointer-events-none"></g>
 
-    <!-- CAPA 2: 1,728 ASIENTOS INDIVIDUALES (Se revelan al hacer zoom >= 1.7x) -->
+    <!-- CAPA 2: 1,730 ASIENTOS INDIVIDUALES (Se revelan al hacer zoom >= 1.7x) -->
     <g id="layer-seats" style="display: none;"></g>
 
     <!-- CAPA 3: ESCENARIO -->

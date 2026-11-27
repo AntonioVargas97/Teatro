@@ -19,7 +19,7 @@ Follow these testing, mocking, concurrency, and CI conventions across `backend/`
   ```
 
 ### Unit & Integration Tests (`TestCase`)
-- Test business transitions in `services.py` (`<= 6` sub-sections, `>= $100.00 MXN`, single-function `OrdenCompra`, `30m`/`0m` closes blocking `APARTADO -> checkout`, `50/50` vs `100%` at `>30d`/`D-21` and reschedule recalc, Mon-Fri SLA, midnight-crossing functions, `bulk_create` of `1,728` rows on `PUBLICADO`, `$0.00` courtesies, PDF/CSV exports and batch contingency reconciliation, cancellations including `CANCELADO_POR_ARRENDATARIO` with sold tickets, late-payment auto-refunds vs `REEMBOLSO_BANCARIO_PENDIENTE`).
+- Test business transitions in `services.py` (`<= 6` sub-sections, `>= $100.00 MXN`, single-function `OrdenCompra`, `30m`/`0m` closes blocking `APARTADO -> checkout`, `50/50` vs `100%` at `>30d`/`D-21` and reschedule recalc, Mon-Fri SLA, midnight-crossing functions, `bulk_create` of `1,730` rows on `PUBLICADO`, `$0.00` courtesies, PDF/CSV exports and batch contingency reconciliation, cancellations including `CANCELADO_POR_ARRENDATARIO` with sold tickets, late-payment auto-refunds vs `REEMBOLSO_BANCARIO_PENDIENTE`).
 - **Schema and integrity tests:** query `pg_constraint` and fail if any of the 14 composite FKs is missing. Walk every model and fail if a foreign key is not `on_delete=PROTECT`. Check that no foreign key points from a lower layer to a higher one (cross-layer FK check), and run the `layers` contract of `import-linter`.
 - **Publication gate and sale phases:** an event cannot be published until every enabled section is fully assigned and every pair of sale phase and event section has a price. With simulated time, the sale phase in force is the one with the greatest `inicia_en <= now()`, and each `OrdenCompraDetalle` keeps the phase and price in force when the seat was held, even after the phase changes.
 - Test RBAC and anti-IDOR rules in `permissions.py` across all 4 roles (`ADMIN`, `CAJERO`, `VERIFICADOR`, `USUARIO`) and anonymous `Visitante` (`401`/`403` verification on cross-user resources).
@@ -57,7 +57,7 @@ Follow these testing, mocking, concurrency, and CI conventions across `backend/`
   npm run test:e2e      # playwright test
   ```
 - Cover critical user journeys end-to-end:
-  1. **Compra (`compra.spec.ts`):** Register/login preserving selected seat, 1,728-seat map selection, single-function cart timer, Stripe Sandbox checkout, and box-office sale by `CAJERO`.
+  1. **Compra (`compra.spec.ts`):** Register/login preserving selected seat, 1,730-seat map selection, single-function cart timer, Stripe Sandbox checkout, and box-office sale by `CAJERO`.
   2. **Acceso (`acceso.spec.ts`):** Ticket PDF/QR emission, online QR validation by `VERIFICADOR` (valid, duplicate, wrong function, out-of-window), manual short-folio fallback, and contingency export/reconciliation.
   3. **Cotización (`cotizacion.spec.ts`):** Multi-day quote request, `ADMIN` review/alternative dates (`PROPUESTA_RETENIDA`), approval (`PRE_RESERVADO`), payment, poster upload, and tariff sub-section configurator.
 

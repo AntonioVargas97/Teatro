@@ -1,4 +1,5 @@
 @startuml ME01_Cotizacion_Arrendamiento
+' Alineado con BD v6.2 y Contrato API v1
 ' Actualizado 2026-11-26: alineado con BD v6.2. Estados financieros derivados (no columnas), PagoOrden/PagoArrendamiento, webhook_stripe, contingencia_funcion por tabla, cotizacion_version al aprobar, asignacion_butaca para el inventario.
 hide empty description
 skinparam state {
@@ -36,7 +37,11 @@ CONFIRMADO --> CONFIRMADO : Saldo 50% <= D-21 23:59:59\n[sin fichas en últimas 
 CONFIRMADO --> CONFIRMADO : Reprogramar [>= 21d (1ra vez) o Teatro]\n[si < 21d liquidar 100% previo]\n/ actualiza BloqueoAgenda y D-21
 
 CONFIRMADO --> CANCELADO_POR_ARRENDATARIO : Solicitud cliente + Admin\no incumple saldo D-21\n/ detiene venta y QRs si hay boletos;\nliberación explícita de agenda por Admin
-CONFIRMADO --> CANCELADO_POR_TEATRO : Fuerza mayor / Teatro\n/ 100% ext. o reprogramación;\ndetiene venta y QRs
+CONFIRMADO --> CANCELADO_POR_TEATRO : Fuerza mayor / Teatro [T-1.16a]\n/ 100% ext. (reembolso directo);\ndetiene venta y QRs
+CONFIRMADO --> CANCELADA_REPROGRAMABLE : Solicitante elige reprogramar [T-1.16b]\n[POST eleccion-cancelacion/]
+CANCELADO_POR_TEATRO --> CANCELADA_REPROGRAMABLE : Solicitante elige reprogramar\n[POST eleccion-cancelacion/]
+CANCELADA_REPROGRAMABLE --> CONFIRMADO : Admin asigna nueva fecha libre [T-1.16c]\n[sin costo, conserva saldo y BloqueoAgenda]
+CANCELADA_REPROGRAMABLE --> [*]
 CONFIRMADO --> FINALIZADO : Concluyen todas las fechas\ndel arrendamiento
 
 CANCELADO_POR_ARRENDATARIO --> CANCELADO_POR_ARRENDATARIO : Saldo 50% tardío post D-21\n/ tarjeta: Refund 100% Stripe;\nficha SPEI/efectivo: reembolso BANCARIO_EXTERNO (REEMBOLSO_BANCARIO_PENDIENTE)

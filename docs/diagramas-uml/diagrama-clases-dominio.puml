@@ -265,7 +265,7 @@ class CancelacionArrendamiento <<cotizaciones>> #C5E0B4 {
 class Usuario <<usuarios>> #BDD7EE {
   + correo : String {unique}
   + nombre : String
-  + apellidos : String
+  + apellidos : String [0..1]
   + rol : RolUsuario
   + is_active : Boolean
   + session_version : Integer

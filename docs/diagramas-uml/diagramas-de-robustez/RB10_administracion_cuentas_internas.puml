@@ -1,4 +1,5 @@
 @startuml RB10_administracion_cuentas_internas
+' Alineado con BD v6.2 y Contrato API v1
 skinparam shadowing false
 skinparam defaultTextAlignment center
 skinparam nodesep 35

@@ -41,7 +41,16 @@ Las respuestas de error 4xx/5xx de la API (excepto la sonda interna de salud) de
 
 **Errores comunes.** El manejador de DRF devuelve `code, message, details`. Códigos por defecto: 400 `DATOS_INVALIDOS` (errores por campo en `details`), 401 `SESION_REQUERIDA` o `CREDENCIALES_INVALIDAS`, 403 `PERMISO_DENEGADO` o `CSRF_INVALIDO`, 404 `NO_ENCONTRADO`, 409 `ESTADO_INCOMPATIBLE`, 429 `LIMITE_PETICIONES`, 500 `ERROR_INTERNO`, 503 `SERVICIO_NO_DISPONIBLE`. Las operaciones que siguen precisan sus conflictos específicos. `health/` es interna, sin sesión; su 503 usa exclusivamente los tres indicadores documentados, sin excepciones ni datos de conexión.
 
-**Límites de peticiones.** Nginx limita por IP registro, login y recuperación de contraseña. DRF aplica `ScopedRateThrottle` por usuario autenticado a validación de boletos, apartados, checkout y taquilla. Un 429 incluye `Retry-After` en segundos. El webhook firmado y la sonda de salud quedan exentos. Las cuotas numéricas son parámetros de despliegue.
+**Límites de peticiones (Throttling).** Nginx limita por IP registro, login y recuperación de contraseña. DRF aplica `ScopedRateThrottle` por usuario autenticado a validación de boletos, apartados, checkout y taquilla. Toda respuesta `429` incluye la cabecera estándar `Retry-After: <segundos>` y el cuerpo uniforme:
+```json
+{
+  "error": {
+    "code": "LIMITE_PETICIONES",
+    "message": "Ha excedido el límite de solicitudes permitidas. Intente de nuevo más tarde.",
+    "details": { "retry_after": 30 }
+  }
+}
+``` El webhook firmado y la sonda de salud quedan exentos. Las cuotas numéricas son parámetros de despliegue.
 
 **Consultas de listas.** Además de la paginación, se aceptan estos filtros. Los ID son enteros positivos, los estados y canales pertenecen al recurso. Fechas civiles inclusivas en hora local; intervalos de ocupación con instantes ISO 8601 y fin exclusivo. Un rango invertido devuelve 400.
 
@@ -83,7 +92,7 @@ En registro se envían `acepta_privacidad: true` y `acepta_terminos: true`. El b
 | `GET / POST cartelera/gestion/eventos/` | A | Listar por estado u origen / crear directo con {nombre,categoria_id,modalidad,bloques,funciones} → 201 evento. El arrendado se vincula a la cotización formalizada. |
 | `GET / PATCH cartelera/gestion/eventos/{id}/` | A o U arrendatario propio (lectura) | 200 detalle de gestión. A edita nombre y categoría. Cambios de agenda siguen la operación de reprogramación. |
 | `POST cartelera/eventos/{id}/funciones/` | A | {inicio_en,fin_en,bloque_id} → 201 función. Inicio y fin deben caber en el bloque del evento. |
-| `POST cartelera/eventos/{id}/resolver-vencimiento/` | A | {accion,motivo,nueva_fecha_limite?} → 200 estado. Acciones PUBLICAR, PRORROGAR, REALIZAR_SIN_PUBLICACION, CANCELAR. |
+| `POST cartelera/eventos/{id}/resolver-vencimiento/` | A | {accion,motivo,nueva_fecha_limite?} → 200 estado. Acciones APOYO_ADMIN, PRORROGA, OPERACION_SIN_CARTELERA, CANCELACION. |
 | `POST cartelera/funciones/{id}/reprogramar/` | A | {inicio_en,fin_en,bloques,motivo} → 200 función con horario anterior y nuevo. |
 | `POST cartelera/eventos/{id}/cancelar/` | A | {causa,motivo,liberar_agenda} → 200 estado y resultado de liberación explícita. Invalida boletos y cierra ambos canales. |
 
@@ -202,7 +211,8 @@ El mapa incluye la puerta de acceso de la sección cuando esté configurada y co
 | `POST ventas/taquilla/apartar/` | `CAJERO`; `funcion_id, butacas`; cuenta del cajero en sesión. | `200` con el mismo detalle del apartado web. Comparte inventario y temporizador con el portal; aplica el límite de 10 por operación. |
 | `POST ventas/taquilla/cobrar/` | `CAJERO`; `orden_id` de su operación y `metodo_pago` (`EFECTIVO` o `TARJETA_TERMINAL`). | `200` con `orden_id, estado: PAGADA, folio, total, boletos`. Requiere apartado vigente y taquilla abierta. Un cobro repetido sobre la misma orden ya pagada devuelve el comprobante existente. |
 | `GET ventas/carrito/` | U/C propio | 200 {carrito:null} o {carrito:Orden}. |
-| `GET ventas/pagos/ · POST ventas/ordenes/{id}/anulaciones/` | A | Listar cobros por desde,hasta,estado,canal / {motivo} → 201 asiento de ajuste administrativo con ajuste_id y orden_id. Solo TAQUILLA PAGADA y ningún boleto utilizado; de lo contrario 409 AJUSTE_NO_PERMITIDO. La orden conserva PAGADA, sus boletos, QR e inventario. El ajuste contable auditado no ejecuta una devolución Stripe ni abre reventa; la invalidación por cancelación de un evento pertenece a su flujo específico. |
+| `GET ventas/pagos/` | A | Listar cobros por `desde, hasta, estado, canal` para conciliación y arqueo. |
+| `POST ventas/ordenes/{id}/anulaciones/` | A (`ADMIN`) | `{"motivo":"Error en captura de ventanilla"}` → `200 {"orden_id":id,"estado":"ANULADA"}`. Exclusivo para órdenes de canal `TAQUILLA` en estado `PAGADA`, con 0 boletos utilizados (`USADO` / `USADO_CONTINGENCIA`) y función no concluida; de lo contrario `409 ANULACION_NO_PERMITIDA`. En transacción atómica bajo candados globales: `orden_compra.estado = "ANULADA"`, `boleto.estado = "INVALIDADO"`, `orden_compra_detalle.activo = False`, `disponibilidad_butaca.estado = "DISPONIBLE"` (liberando localidades para reventa limpia) y se audita en `registro_auditoria` (`accion="ANULACION_ORDEN_TAQUILLA"`). El reembolso monetario (efectivo o cancelación de voucher) se entrega presencialmente en ventanilla física (sin integración Stripe). |
 | `GET ventas/ordenes/` | U propio o A global | `200` con órdenes paginadas. |
 | `GET ventas/ordenes/{id}/` | U propio, C para su operación o A | `200` con la orden y el estado confirmado por el servidor. |
 | `POST ventas/ordenes/{id}/liberar/` | U o C propio; `{butacas: [412]}` | `200` con detalle restante y vencimiento original. Retirar la última butaca expira la orden. En cobro: `409 PAGO_EN_PROCESO`. |
@@ -246,7 +256,7 @@ El checkout cobra el total de los precios fijados por butaca. Stripe Elements ut
 **Mapa y disponibilidad.** Función privada o sin publicar: 404 para consultas públicas. Ambos recursos envían `ETag` y `Cache-Control: private, no-cache, must-revalidate`. La caché breve es interna a Redis y se invalida en `on_commit`. Ejemplos de respuesta 200 con una localidad representativa; en producción se entrega toda la función.
 
 ```json
-{"funcion_id":12,"fase_venta_id":2,"precios":[{"seccion_evento_id":4,"precio":"200.00"}],"butacas":[{"butaca_id":412,"seccion_oficial":"Luneta","seccion_evento_id":4,"puerta_acceso":null,"fila":"A","asiento":"12","es_accesible":false,"habilitada":true,"estado":"DISPONIBLE"}]}
+{"funcion_id":12,"fase_venta_id":2,"precios":[{"seccion_evento_id":4,"precio":"200.00"}],"butacas":[{"butaca_id":412,"seccion_oficial":"Luneta","seccion_evento_id":4,"acceso_puerta":null,"fila":"A","asiento":"12","es_accesible":false,"habilitada":true,"estado":"DISPONIBLE"}]}
 ```
 ```json
 {"funcion_id":12,"fase_venta_id":2,"butacas":[{"butaca_id":412,"estado":"DISPONIBLE"}]}
@@ -262,7 +272,7 @@ El checkout cobra el total de los precios fijados por butaca. Stripe Elements ut
 
 | Método y ruta | Acceso y entrada | Respuesta y reglas |
 | :--- | :--- | :--- |
-| `GET boletos/ y boletos/{id}/` | U propio, A global | 200 lista o detalle con evento, función, inicio, sección oficial, zona comercial cuando difiera, puerta de acceso cuando esté configurada, fila, asiento, orden, folio, método, plataforma y estado. Detalle autorizado incluye QR. |
+| `GET boletos/ y boletos/{id}/` | U propio, A global | 200 lista o detalle con evento, función, inicio, sección oficial, zona comercial cuando difiera, acceso_puerta cuando esté configurada, fila, asiento, orden, folio, método, plataforma y estado. Detalle autorizado incluye QR. |
 | `GET boletos/{id}/archivo/` | U propio, A | 200 application/pdf con los datos del boleto y QR. Incluye cortesías para A. |
 | `POST boletos/ordenes/{id}/impresiones/` | C/A | {motivo?} → 200 PDF de orden presencial. Reimpresión requiere motivo y reutiliza folios y QR. |
 
@@ -307,10 +317,10 @@ Ejemplos de petición al escáner. El primero usa cámara en la puerta de una fu
 **Lectura e impresión.** El detalle entrega un `qr_token` opaco para renderizar en pantalla y un estado entre EMITIDO, USADO, USADO_CONTINGENCIA e INVALIDADO. Ejemplo de detalle; el listado usa la envoltura de paginación y omite el token.
 
 ```json
-{"id":91,"evento":"Gala","funcion_id":12,"inicio_en":"2027-02-12T19:00:00-06:00","seccion_oficial":"Luneta","seccion_evento":"General","puerta_acceso":null,"fila":"A","asiento":"12","orden":"T-87","folio_corto":"BH7K9M2P","metodo_pago":"EFECTIVO","plataforma":"Teatro de la Ciudad de Coatzacoalcos","estado":"EMITIDO","qr_token":"<token firmado>"}
+{"id":91,"evento":"Gala","funcion_id":12,"inicio_en":"2027-02-12T19:00:00-06:00","seccion_oficial":"Luneta","seccion_evento":"General","acceso_puerta":null,"fila":"A","asiento":"12","orden":"T-87","folio_corto":"BH7K9M2P","metodo_pago":"EFECTIVO","plataforma":"Teatro de la Ciudad de Coatzacoalcos","estado":"EMITIDO","qr_token":"<token firmado>"}
 ```
 
-El Cajero imprime solo órdenes TAQUILLA PAGADA; el servidor consulta la bitácora de impresiones para distinguir primera entrega de reimpresión. Una reimpresión sin motivo devuelve `400 MOTIVO_REQUERIDO` y cada impresión exitosa queda registrada. El PDF reutiliza los mismos folios.
+El Cajero imprime solo órdenes TAQUILLA PAGADA; el servidor consulta `registro_auditoria` (acciones `IMPRESION_TAQUILLA` / `REIMPRESION_TAQUILLA` sobre `orden_compra`) para distinguir primera entrega de reimpresión. Una reimpresión sin motivo devuelve `400 MOTIVO_REQUERIDO` y cada impresión exitosa queda registrada inmutablemente en la auditoría del sistema. El PDF reutiliza los mismos folios.
 
 **Dos puertas simultáneas.** Si el candado `nowait=True` está ocupado, se revierte el intento y se devuelve `409 VALIDACION_EN_CURSO` con `details: {}`. La pantalla solicita reintento sin permitir el ingreso. Solo una lectura confirmada permite emitir `BOLETO_YA_USADO` con `details.usado_en`. OTRA_FUNCION incluye `funcion_inicio_en`, ACCESO_ANTICIPADO incluye `abre_en` y FUNCION_CONCLUIDA incluye `fin_en`; todos son instantes ISO 8601. La contención nunca consume el boleto.
 
@@ -320,7 +330,7 @@ En reconciliación el campo multipart se llama `archivo`. También se admite `{"
 
 | Método y ruta | Acceso y entrada | Respuesta y reglas |
 | :--- | :--- | :--- |
-| `POST cotizaciones/` | `USUARIO`; `nombre_evento, categoria_id, modalidad, contacto_nombre, contacto_telefono, contacto_correo, asistentes_estimados, es_multidia, bloques, extras` en JSON. El póster opcional se adjunta por separado. | `201` con `cotizacion_id, estado: EN_REVISION` y desglose estimado. Más de 1,728 asistentes o bloques inválidos devuelven `400`. La recepción de la solicitud aún deja libre la agenda. |
+| `POST cotizaciones/` | `USUARIO`; `nombre_evento, categoria_id, modalidad, contacto_nombre, contacto_telefono, contacto_correo, asistentes_estimados, es_multidia, bloques, extras` en JSON. El póster opcional se adjunta por separado. | `201` con `cotizacion_id, estado: EN_REVISION` y desglose estimado. Más de 1,730 asistentes o bloques inválidos devuelven `400`. La recepción de la solicitud aún deja libre la agenda. |
 | `POST cotizaciones/{id}/versiones/` | `ADMIN`; `monto_oficial` y `nota` opcional. | `201` con la versión nueva y su número consecutivo. Cada ajuste crea una fila en `cotizacion_version`; las versiones anteriores se conservan. |
 | `POST cotizaciones/{id}/aprobar/` | `ADMIN`; `monto_oficial` para una solicitud en revisión, y `asistentes_acordados` opcional en la entrada, que se guarda en `cotizacion_parametros`. Crea la versión vigente en `cotizacion_version` (o toma la existente) y la marca como aprobada. | `200` con `estado: PRE_RESERVADO, monto_oficial, esquema_pago, monto_anticipo, saldo, pre_reserva_expira_en` y el vencimiento del saldo cuando aplique. Un traslape devuelve `409 CRUCE_AGENDA` sin aprobar parcialmente. |
 | `POST cotizaciones/{id}/alternativas/` | `ADMIN`; de una a tres opciones de fecha y turno libres y mutuamente disjuntas. | `200` con `estado: PROPUESTA_RETENIDA`, opciones y vencimiento. Cantidad inválida: `400`. Traslape: `409 CRUCE_AGENDA`. |
@@ -332,7 +342,7 @@ En reconciliación el campo multipart se llama `archivo`. También se admite `{"
 | `POST cotizaciones/{id}/resolver-pago-extemporaneo/` | A | {decision,motivo} → 200 detalle. ACEPTAR revalida disponibilidad; RECHAZAR tramita reembolso técnico íntegro. |
 | `POST cotizaciones/{id}/cambios/` | U propio | {tipo,motivo,bloques_propuestos?} → 201 petición. Tipo CANCELACION o REPROGRAMACION. |
 | `POST cotizaciones/{id}/cambios/{cambio_id}/resolver/` | A | {decision,motivo,liberar_agenda?,bloques?} → 200 estado, efecto en agenda y tratamiento administrativo. |
-| `POST cotizaciones/{id}/eleccion-cancelacion/` | U propio | Tras cancelación por el teatro, {opcion} REEMBOLSO_EXTERNO o REPROGRAMACION → 200 elección registrada. |
+| `POST cotizaciones/{id}/eleccion-cancelacion/` | U propio | Tras cancelación por el teatro, {opcion} REEMBOLSO o REPROGRAMACION → 200 elección registrada. |
 | `GET agenda/bloqueos/` / `POST agenda/mantenimientos/` | `ADMIN`; consulta por intervalo, o alta con `inicio_en, fin_en` y motivo. | Consulta: `200` con ocupaciones. Alta: `201` con bloqueo confirmado; intervalo inválido: `400`; traslape: `409 CRUCE_AGENDA`. Dos bloques contiguos son compatibles porque el fin del intervalo es exclusivo. |
 | `POST agenda/mantenimientos/{id}/liberar/` | A; motivo | `200` con bloqueo liberado y registro de auditoría. |
 
@@ -352,12 +362,12 @@ En reconciliación el campo multipart se llama `archivo`. También se admite `{"
     {
       "fecha": "2027-02-12",
       "turno": "MATUTINO",
-      "actividad": "MONTAJE"
+      "finalidad": "MONTAJE_ENSAYO"
     },
     {
       "fecha": "2027-02-12",
       "turno": "VESPERTINO",
-      "actividad": "FUNCION"
+      "finalidad": "EVENTO"
     }
   ],
   "extras": [{"extra_id": 4, "cantidad": 2}]
@@ -395,7 +405,6 @@ En la aprobación se evalúa la **primera fecha reservada**, incluido el montaje
 
 | Método y ruta | Entrada, permisos y resultado |
 | :--- | :--- |
-| `PUT cotizaciones/{id}/poster/` | U propietario, durante la solicitud; multipart con campo `poster` JPG/PNG/WebP hasta 5 MB. 200 con `poster_url`; 400 por archivo inválido, 403 por propiedad. Tras formalización se usa la ruta del evento. |
 | `GET cotizaciones/{id}/comprobante/` | U propietario o A; 200 `application/pdf` (ReportLab) con el desglose correspondiente a esa cotización y la versión aprobada cuando exista. 403 por propiedad, 404 si no existe. |
 | `POST cotizaciones/{id}/pagos/{pago_id}/confirmar-reembolso-bancario/` | A; `motivo` obligatorio y `referencia_externa` opcional. Verifica pago de la cotización y devolución BANCARIO_EXTERNO pendiente. 200 con `pago_id, reembolso_id, estado: COMPLETADO` y registro del operador. Repetición de la misma confirmación conserva el resultado; devolución incompatible: `409 REEMBOLSO_NO_PENDIENTE`. |
 | `POST agenda/bloqueos/{id}/liberar/` | A; `{"motivo":"Cancelación confirmada"}`. Requiere cancelación o término que habilite la liberación. 200 con `bloqueo_id, estado: LIBERADO`; una operación repetida conserva el resultado. Bloque activo incompatible: `409 BLOQUEO_VIGENTE`. AgendaService realiza y audita la liberación explícita. |
@@ -404,11 +413,11 @@ La solicitud y la estimación usan JSON con `extras: [{"extra_id":4,"cantidad":2
 
 | Operación | Ejemplo JSON de entrada |
 | :--- | :--- |
-| Proponer alternativas | `{"opciones":[{"bloques":[{"fecha":"2027-02-16","turno":"MATUTINO","actividad":"FUNCION"}]}],"motivo":"Disponibilidad del recinto"}`. El 200 asigna un ID a cada opción y devuelve el vencimiento. |
+| Proponer alternativas | `{"opciones":[{"bloques":[{"fecha":"2027-02-16","turno":"MATUTINO","finalidad":"EVENTO"}]}],"motivo":"Disponibilidad del recinto"}`. El 200 asigna un ID a cada opción y devuelve el vencimiento. |
 | Responder alternativas | `{"decision":"ACEPTAR","opcion_id":7}` o `{"decision":"RECHAZAR"}` para liberar todas. |
-| Solicitar cambio | `{"tipo":"REPROGRAMACION","motivo":"Cambio de fecha","bloques_propuestos":[{"fecha":"2027-02-16","turno":"MATUTINO","actividad":"FUNCION"}]}`. CANCELACION requiere motivo y omite los bloques. |
-| Resolver cambio | `{"decision":"APROBAR","motivo":"Agenda disponible","bloques":[{"fecha":"2027-02-16","turno":"MATUTINO","actividad":"FUNCION"}]}` o `{"decision":"RECHAZAR","motivo":"Fecha ocupada"}`. |
-| Elección tras cancelación por el teatro | `{"opcion":"REEMBOLSO_EXTERNO"}` o `{"opcion":"REPROGRAMACION"}`. |
+| Solicitar cambio | `{"tipo":"REPROGRAMACION","motivo":"Cambio de fecha","bloques_propuestos":[{"fecha":"2027-02-16","turno":"MATUTINO","finalidad":"EVENTO"}]}`. CANCELACION requiere motivo y omite los bloques. |
+| Resolver cambio | `{"decision":"APROBAR","motivo":"Agenda disponible","bloques":[{"fecha":"2027-02-16","turno":"MATUTINO","finalidad":"EVENTO"}]}` o `{"decision":"RECHAZAR","motivo":"Fecha ocupada"}`. |
+| Elección tras cancelación por el teatro | `{"opcion":"REEMBOLSO"}` o `{"opcion":"REPROGRAMACION"}`. |
 | Alta de mantenimiento (respuesta 201) | `{"bloqueo_id":73,"estado":"CONFIRMADO","inicio_en":"2027-02-15T08:00:00-06:00","fin_en":"2027-02-15T12:00:00-06:00","motivo":"Revisión de luces"}` |
 
 ## 7. Auditoría, monitoreo y aceptación

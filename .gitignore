@@ -1,3 +1,6 @@
+# Scripts temporales y scratch
+scratch/
+
 # Variables de entorno y secretos locales
 .env
 .env.local

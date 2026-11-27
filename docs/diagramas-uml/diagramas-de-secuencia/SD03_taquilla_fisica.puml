@@ -1,4 +1,5 @@
 @startuml SD03_taquilla_fisica
+' Alineado con BD v6.2 y Contrato API v1
 skinparam shadowing false
 skinparam sequenceMessageAlign left
 skinparam responseMessageBelowArrow true
@@ -32,7 +33,7 @@ UI -> CAR_CTL ++ : GET /api/v1/cartelera/funciones/{id}/
 CAR_CTL -> E_FUN : obtener función y margen de cierre de taquilla (0 min)
 CAR_CTL --> UI -- : 200 {funcion, cierre_taquilla_min}
 UI -> INV_CTL ++ : GET /api/v1/inventario/funciones/{id}/mapa/
-INV_CTL -> E_DIS : consultar 1,728 butacas, fase vigente y precios
+INV_CTL -> E_DIS : consultar 1,730 butacas, fase vigente y precios
 INV_CTL --> UI -- : 200 {funcion_id, fase_venta_id, precios, butacas} + ETag
 UI --> C : Muestra mapa interactivo compartido
 

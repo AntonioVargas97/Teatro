@@ -1,6 +1,6 @@
 ---
 name: Teatro de la Ciudad de Coatzacoalcos
-description: Sistema visual cívico, cálido y operativo para la cartelera, venta directa de 1,728 butacas en 6 secciones, consola administrativa en Arena Cálida y control de acceso QR en Azul Nocturno del Golfo.
+description: Sistema visual cívico, cálido y operativo para la cartelera, venta directa de 1,730 butacas en 6 secciones, consola administrativa en Arena Cálida y control de acceso QR en Azul Nocturno del Golfo.
 colors:
   azul-golfo: "#1E3A8A"
   golfo-profundo: "#162C6B"
@@ -101,7 +101,7 @@ components:
 
 La identidad visual del ecosistema traduce la presencia cívica y arquitectónica del recinto diseñado por el Arq. Abraham Zabludovsky a tres caras especializadas con un ADN compartido: el **Portal Público** (`Persuade / Experience`), la **Consola Operativa de Administración** (`Operate — Backstage en Arena Cálida`) y el **Puesto de Puerta QR** (`Operate — Azul Nocturno del Golfo`).
 
-En el portal público, `Cinzel` domina los hitos escénicos y `Manrope` sostiene la lectura operativa de cartelera, precios y compra sobre el plano oficial de **1,728 butacas en 6 secciones** (`+12` accesibles `♿`). En las superficies operativas internas (`admin/*.html` y `verificador.html`), la jerarquía se invierte hacia la velocidad tabular (`tabular-nums`), contraste WCAG 2.1 AA/AAA estricto y ausencia de ruido visual, manteniendo inconfundiblemente la misma familia cromática del Teatro.
+En el portal público, `Cinzel` domina los hitos escénicos y `Manrope` sostiene la lectura operativa de cartelera, precios y compra sobre el plano oficial de **1,730 butacas en 6 secciones** (`+12` accesibles `♿`). En las superficies operativas internas (`admin/*.html` y `verificador.html`), la jerarquía se invierte hacia la velocidad tabular (`tabular-nums`), contraste WCAG 2.1 AA/AAA estricto y ausencia de ruido visual, manteniendo inconfundiblemente la misma familia cromática del Teatro.
 
 **Key Characteristics:**
 - Ecosistema cohesivo en torno a `Azul Golfo` (`#1E3A8A`) y `Arena Arquitectónica` (`#D9CBB8`) para público, backstage y puerta QR.
@@ -143,7 +143,7 @@ Una paleta institucional sobria que combina azul profundo del Golfo, calidez are
 **Display Font:** `Cinzel`, `Georgia, serif` (pesos `600`, `700`, `800`, `900`)
 **Body Font:** `Manrope`, `system-ui, sans-serif` (pesos `400`, `500`, `600`, `700`, `800`)
 
-**Character:** `Cinzel` aporta solemnidad cívica a títulos de obra y encabezados de portada, mientras `Manrope` (apoyado con `tabular-nums` en consola y taquilla) asegura escaneo veloz en horarios, aforos (`1,728`), métricas SLA e importes en MXN.
+**Character:** `Cinzel` aporta solemnidad cívica a títulos de obra y encabezados de portada, mientras `Manrope` (apoyado con `tabular-nums` en consola y taquilla) asegura escaneo veloz en horarios, aforos (`1,730`), métricas SLA e importes en MXN.
 
 ### Hierarchy
 - **Display** (`800`, `3rem`–`3.75rem`, `line-height: 1.15`): Titular principal del mural en `index.html`.
@@ -159,7 +159,7 @@ Una paleta institucional sobria que combina azul profundo del Golfo, calidez are
 
 - **Portal Público y Operaciones Presenciales:** Contenedor fluido (`px-4 sm:px-6 md:px-[100px]`), navbar fija superior de `80px` en Azul Golfo. `boletos.html` y `taquilla.html` usan retícula **`8 + 4`** y `cotizar.html` usa **`7 + 5`**.
 - **Consola Administrativa (`/admin/`):** Abandona el sidebar oscuro lateral para adoptar la **Cabecera Superior Azul Golfo (`80px`) agrupada en 4 pilares** (*Hoy*, *Programación*, *Comercial y Sala*, *Recinto*) + **Sub-barra contextual en Arena** (`#EFECE4`) sobre un lienzo cálido `#F6F4EF` con ancho máximo `1380px`.
-  - *Resumen Operativo (`admin/index.html`):* Tira tabular unificada de 4 cifras (con divisores verticales limpios, sin tarjetas clonadas con iconos), pulso de ocupación de sala (`X / 1,728`) y malla `7 + 5` de decisiones prioritarias y próximas funciones.
+  - *Resumen Operativo (`admin/index.html`):* Tira tabular unificada de 4 cifras (con divisores verticales limpios, sin tarjetas clonadas con iconos), pulso de ocupación de sala (`X / 1,730`) y malla `7 + 5` de decisiones prioritarias y próximas funciones.
   - *Cotizaciones (`admin/cotizaciones.html`) y Eventos (`admin/cartelera.html`):* Mesas de trabajo **Split `7 + 5`** con bandeja tabular a la izquierda e **Inspector Lateral Fijo (`sticky`)** a la derecha para aprobar, proponer fechas alternativas, resolver `D-15`, publicar o reprogramar sin modales superpuestos.
 - **Verificador Puerta QR (`verificador.html`):** Columna centrada (`max-w-2xl`) en Azul Nocturno `#0B1736` diseñada para operación con una mano: barra de turno y telemetría arriba (`Ingresados / Emitidos`), **Tarjeta-Pase de Veredicto dominante sobre el lector** (`#ver-result-card`), formulario manual + cámara en zona media y bloque inferior separado para bitácora y simulador de QA (`§2.8`).
 
@@ -183,7 +183,7 @@ Contenedores operativos contenidos (`12px`–`16px`: `rounded-xl` / `rounded-2xl
 
 - **Buttons:** Cápsula `9999px`. Público primario: `bg-accent text-white`; Operativo Admin/Verificador: `bg-primary text-white` (`10.36:1`) o `bg-accent text-base-text` (`7.0:1`).
 - **Tables (Consola Admin):** Cabecera cálida `bg-[#EFECE4] text-golfo-deep` con divisores `divide-arena-border`, cifras con `.tabular-nums`, sin cabeceras negras sólidas.
-- **Signature Component — Mapa Interactivo de Butacas (`img/plano-teatro.svg`):** **6 secciones oficiales** (`Luneta` `#DC2626` · 564, `Platea` `#EA580C` · 144, `Mezzanine` `#1E3A8A` · 291, `Primer Piso` `#15803D` · 287, `Segundo Piso` `#7E22CE` · 386, `Palcos` `#0284C7` · 56) sumando **1,728 localidades** (+ **12 accesibles `♿`**) con zoom semántico LOD (`>= 1.7x`) y 4 modos (`public`, `taquilla`, `admin-sala`, `configurator`).
+- **Signature Component — Mapa Interactivo de Butacas (`img/plano-teatro.svg`):** **6 secciones oficiales** (`Luneta` `#DC2626` · 566, `Platea` `#EA580C` · 144, `Mezzanine` `#1E3A8A` · 291, `Primer Piso` `#15803D` · 287, `Segundo Piso` `#7E22CE` · 386, `Palcos` `#0284C7` · 56) sumando **1,730 localidades** (+ **12 accesibles `♿`**) con zoom semántico LOD (`>= 1.7x`) y 4 modos (`public`, `taquilla`, `admin-sala`, `configurator`).
 - **Signature Component — Tarjeta-Pase Verificador QR (`verificador.html`):** Bandeja superior segmentada con ícono SVG inequívoco, banda de estado (`VALIDO`, `YA_UTILIZADO`, `OTRA_FUNCION`, `DEMASIADO_PRONTO`, `FUNCION_CONCLUIDA`, `INVALIDO`), lectura ampliada de Sección/Fila/Asiento y telemetría de ingreso.
 
 ## Do's and Don'ts
@@ -196,4 +196,4 @@ Contenedores operativos contenidos (`12px`–`16px`: `rounded-xl` / `rounded-2xl
 ### Don't:
 - **Don't** introducir gradientes decorativos, `blur-3xl`, barras laterales unilaterales (`border-l-4`) ni tarjetas clonadas con cajas de íconos en paneles administrativos.
 - **Don't** colocar el simulador de pruebas por encima del bloque de resultado en `verificador.html`.
-- **Don't** alterar las **6 secciones oficiales** ni el total de **1,728 butacas** en el plano oficial ni mezclar estilos de boleteras externas.
+- **Don't** alterar las **6 secciones oficiales** ni el total de **1,730 butacas** en el plano oficial ni mezclar estilos de boleteras externas.

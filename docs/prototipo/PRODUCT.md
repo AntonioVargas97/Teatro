@@ -24,7 +24,7 @@ El proyecto es una **propuesta formal para la administración real del Teatro / 
 
 ## Positioning
 
-Hoy cada evento se vende en una boletera externa distinta (Eticket, TusBoletos.mx, Ticketmanía, Tiketpass, ShowBizTicket, Notikumi, entre otras), además de la taquilla física. Este portal **reemplaza esa fragmentación**: una sola venta, con la marca del propio teatro (*El Foro Monumental*), sobre el plano oficial de sus **1,728 butacas en 6 secciones**. Una boletera genérica no puede ofrecer esa fidelidad espacial ni coherencia institucional.
+Hoy cada evento se vende en una boletera externa distinta (Eticket, TusBoletos.mx, Ticketmanía, Tiketpass, ShowBizTicket, Notikumi, entre otras), además de la taquilla física. Este portal **reemplaza esa fragmentación**: una sola venta, con la marca del propio teatro (*El Foro Monumental*), sobre el plano oficial de sus **1,730 butacas en 6 secciones**. Una boletera genérica no puede ofrecer esa fidelidad espacial ni coherencia institucional.
 
 ## Operating Context
 
@@ -36,8 +36,8 @@ Hoy cada evento se vende en una boletera externa distinta (Eticket, TusBoletos.m
 ## Capabilities and Constraints
 
 **Ya presente en el prototipo:**
-- **Cartelera (`index.html`):** búsqueda, filtro por categoría y fechas; diferencia eventos **Comerciales** (con venta numerada) de **Públicos** (*Entrada Libre · Control de acceso por el organizador hasta 1,728 personas*) y oculta **Privados**. Selector de función cuando existen múltiples funciones.
-- **Compra de boletos (`boletos.html`) y Taquilla Física (`taquilla.html`):** mapa SVG oficial (`img/plano-teatro.svg` / `js/plano-teatro-svg.js`) con **6 secciones oficiales y 1,728 butacas numeradas** (**Luneta** 564, **Platea** 144, **Mezzanine** 291, **Primer Piso** 287, **Segundo Piso** 386, **Palcos** 56; incluye **12 lugares accesibles `♿`**). Zoom semántico LOD (`>= 1.7x`), límite anti-reventa de hasta `10` boletos por función, apartado temporal de `10 min` (+`5 min` en pago) y pasarela simulada.
+- **Cartelera (`index.html`):** búsqueda, filtro por categoría y fechas; diferencia eventos **Comerciales** (con venta numerada) de **Públicos** (*Entrada Libre · Control de acceso por el organizador hasta 1,730 personas*) y oculta **Privados**. Selector de función cuando existen múltiples funciones.
+- **Compra de boletos (`boletos.html`) y Taquilla Física (`taquilla.html`):** mapa SVG oficial (`img/plano-teatro.svg` / `js/plano-teatro-svg.js`) con **6 secciones oficiales y 1,730 butacas numeradas** (**Luneta** 566, **Platea** 144, **Mezzanine** 291, **Primer Piso** 287, **Segundo Piso** 386, **Palcos** 56; incluye **12 lugares accesibles `♿`**). Zoom semántico LOD (`>= 1.7x`), límite anti-reventa de hasta `10` boletos por función, apartado temporal de `10 min` (+`5 min` en pago) y pasarela simulada.
 - **Configurador tarifario (`configurador.html`):** secciones del evento (conservación 6 secciones, sección única, agrupación o subdivisión de hasta ≤ 6 por sección oficial), fases de venta consecutivas, piso tarifario `>= $100.00 MXN`, cobertura 100% sin butacas huérfanas y congelamiento al publicar.
 - **Cotización y seguimiento (`cotizar.html`, `usuario.html`):** solicitud multi-día/turno para modalidades Comercial, Público o Privado, catálogo oficial de infraestructura/extras, subtotal estimado referencial, esquema `50/50` vs `100%`, aceptación de fechas alternativas (`48 h`) y gestión de pagos.
 - **Cuentas, auth y cumplimiento (`cuenta.html`, `legal.html`):** cuenta obligatoria para comprar y cotizar, recuperación de contraseña, control RBAC por rol, Aviso de Privacidad (LFPDPPP) y Términos y Condiciones.
@@ -46,7 +46,7 @@ Hoy cada evento se vende en una boletera externa distinta (Eticket, TusBoletos.m
 
 **Restricciones y exclusiones:**
 - Idioma: español de México. Moneda: `MXN`. Zona horaria: `America/Mexico_City`.
-- La capacidad mostrada debe coincidir exactamente con el plano oficial: **1,728 butacas en 6 secciones** (`+12 accesibles`).
+- La capacidad mostrada debe coincidir exactamente con el plano oficial: **1,730 butacas en 6 secciones** (`incluyendo 12 localidades accesibles ♿`).
 - **Exclusiones explícitas:** sin módulo CMS para editar diseño o textos estáticos institucionales, sin servicios de catering/alimentos ni estacionamiento, y sin borrado físico de registros financieros o eventos confirmados.
 
 **Decisiones abiertas (no inventar):**
@@ -70,7 +70,7 @@ Hoy cada evento se vende en una boletera externa distinta (Eticket, TusBoletos.m
 ## Product Principles
 
 1. **La compra es el camino crítico.** Del cartel a la butaca pagada con la menor fricción posible. Todo lo demás se subordina a ese recorrido.
-2. **Fidelidad al recinto real.** Las **1,728 localidades**, **6 secciones**, numeración y horarios reflejan el teatro verdadero y se verifican contra la configuración oficial.
+2. **Fidelidad al recinto real.** Las **1,730 localidades**, **6 secciones**, numeración y horarios reflejan el teatro verdadero y se verifican contra la configuración oficial.
 3. **El teatro es dueño de su relación con el público.** Las tres superficies (portal, consola backstage y puerta QR) refuerzan una sola familia institucional coherente.
 4. **Operable por el personal del teatro.** Cartelera, agenda, cotizaciones, tarifas de sala, taquilla y acceso QR se operan desde la consola administrativa sin intervención de desarrollo ni CMS sobre el diseño.
 5. **Credibilidad ante la administración.** Ninguna afirmación, cifra o promesa sin respaldo en la evidencia disponible.

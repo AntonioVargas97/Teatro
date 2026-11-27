@@ -47,7 +47,7 @@ El uso incorrecto de tonos dorados y arena rompe legibilidad rápidamente. Aplic
 ### The Bilingual Hierarchy Rule
 - **`Cinzel` comunica solemnidad escénica:** úsala en el titular del mural (`3rem`–`3.75rem`, `leading-[1.15]`), encabezados `h1`/`h2` del portal público (`1.5rem`–`3rem`, `leading-tight`), nombre del evento en `boletos.html` / inspector de Admin, y título `CONTROL DE ACCESO QR` del verificador.
 - **`Manrope` gobierna toda la operación:** úsala en cabeceras `h1` de la consola administrativa (`text-xl sm:text-2xl font-extrabold`), etiquetas (`>= 12px`, `tracking-wider`), tablas, inputs, modales y botones.
-- **Cifras tabulares (`.tabular-nums`):** obligatoria en montos MXN, horarios, contadores `1,728`, fechas de tabla y relojes en tiempo real para evitar saltos visuales al actualizar.
+- **Cifras tabulares (`.tabular-nums`):** obligatoria en montos MXN, horarios, contadores `1,730`, fechas de tabla y relojes en tiempo real para evitar saltos visuales al actualizar.
 
 ---
 

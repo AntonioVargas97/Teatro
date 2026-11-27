@@ -113,7 +113,7 @@
   ],
   "narrative": {
     "northStar": "El Foro Monumental",
-    "overview": "Sistema ecosistémico unificado para el Teatro de la Ciudad de Coatzacoalcos con tres registros: Portal Público (Azul Golfo + Blanco Nube + Cinzel), Consola Operativa de Administración (Cabecera Azul Golfo en 4 Pilares + Lienzo Arena Cálida #F6F4EF + Mesas Split 7+5) y Verificador de Puerta QR (Azul Nocturno del Golfo #0B1736 con Tarjeta-Pase dominante superior) sobre el plano oficial de 1,728 butacas en 6 secciones (+12 accesibles).",
+    "overview": "Sistema ecosistémico unificado para el Teatro de la Ciudad de Coatzacoalcos con tres registros: Portal Público (Azul Golfo + Blanco Nube + Cinzel), Consola Operativa de Administración (Cabecera Azul Golfo en 4 Pilares + Lienzo Arena Cálida #F6F4EF + Mesas Split 7+5) y Verificador de Puerta QR (Azul Nocturno del Golfo #0B1736 con Tarjeta-Pase dominante superior) sobre el plano oficial de 1,730 butacas en 6 secciones (+12 accesibles).",
     "keyCharacteristics": [
       "Ecosistema compartido en torno a Azul Golfo (#1E3A8A) y Arena Arquitectónica (#D9CBB8).",
       "Consola Admin con cabecera superior de 4 pilares, sub-barra Arena y Split 7+5 sin modales repetitivos.",
@@ -126,7 +126,7 @@
       { "name": "The Quiet Rest Rule", "body": "Reposo limpio mediante contraste Arena/Blanco y borde 1px.", "section": "elevation" }
     ],
     "dos": [
-      "Mantener 1,728 localidades en 6 secciones oficiales (+12 accesibles).",
+      "Mantener 1,730 localidades en 6 secciones oficiales (+12 accesibles).",
       "Usar #F6F4EF Arena Cálida en backstage Admin y #0B1736 Azul Nocturno en Verificador QR.",
       "Preservar el tamaño mínimo legible (>= 12px) e íconos SVG consistentes."
     ],

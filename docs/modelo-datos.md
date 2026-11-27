@@ -4,7 +4,7 @@ Plataforma de boletaje y cotización de arrendamiento del Teatro de la Ciudad de
 
 * **Estado:** Versión final para implementar. La v6.2 parte de la v6.1 (sala conservada, precio por fecha de compra con fases de venta y secciones del evento que agrupan o dividen secciones físicas) y agrega: los atributos rescatados del ER v5.6 (`propuesta_fecha.motivo`, `seccion.acceso_puerta`, `cotizacion_version` y `cotizacion_parametros.asistentes_acordados`) y el mapa de módulos definitivo de `arquitectura.md` (módulos base `recinto` y `pagos`). El historial de cambios está en el §10.
 * **Alcance del documento:** sustituye a `Teatro_ER_v5.3.drawio.svg` como base para `models.py`. Diagramas en draw.io: modelo relacional completo en [`modelado_datos/Teatro_MR_v6.2.drawio`](./modelado_datos/Teatro_MR_v6.2.drawio) y diagrama entidad-relación (notación Chen) en [`modelado_datos/Teatro_ER_Chen_v6.2.drawio`](./modelado_datos/Teatro_ER_Chen_v6.2.drawio).
-* **Insumos:** [alcance.md](./alcance.md), [arquitectura.md](./arquitectura.md), [maquinas-de-estado.md](./maquinas-de-estado.md), la auditoría [auditoria-egm-er-v5.3.md](./reportes/auditoria-egm-er-v5.3.md) y la propuesta *Copia ER teatro* (distribución del teatro: sala, sección, asiento, sección del evento, asiento del evento, función, inventario, listas de precio y boleto).
+* **Insumos:** [alcance.md](./alcance.md), [arquitectura.md](./arquitectura.md), [maquinas-de-estado.md](./maquinas-de-estado.md), la auditoría [auditoria-egm-er-v5.3.md](./reportes/egm/auditoria-egm-er-v5.3.md) y la propuesta *Copia ER teatro* (distribución del teatro: sala, sección, asiento, sección del evento, asiento del evento, función, inventario, listas de precio y boleto).
 * **Convenciones:** nombres de tabla y columna en `snake_case` sin acentos; PK `id BIGINT` autoincremental salvo que se indique otra; importes `NUMERIC(10,2)` MXN; instantes `TIMESTAMPTZ` en UTC; enumeraciones como `TEXT` con `CHECK` (Django `TextChoices`); toda FK `ON DELETE PROTECT` (no hay borrado físico de nada contable).
 
 ---
@@ -148,7 +148,7 @@ Extiende `AbstractBaseUser` + `PermissionsMixin`.
 | correo | TEXT | UQ (insensible a mayúsculas), login |
 | password | TEXT | Hash Argon2 |
 | nombre | TEXT | |
-| apellidos | TEXT | |
+| apellidos | TEXT | N (opcional/vacío en cuentas internas) |
 | telefono | TEXT | N |
 | rol | TEXT | `ADMIN`, `CAJERO`, `VERIFICADOR`, `USUARIO` |
 | is_active | BOOLEAN | Suspensión de cuenta |
@@ -180,7 +180,7 @@ Fila única (`id = 1`, `CHECK (id = 1)`). Una columna por parámetro editable de
 
 `apartado_min` (10), `gracia_pago_min` (5), `cierre_web_min` (30), `cierre_taquilla_min` (0), `prereserva_h` (48), `propuesta_h` (48), `revision_extemporanea_h` (72), `limite_publicacion_d` (15), `recordatorio_d` (7), `corte_saldo_d` (21), `margen_50_50_d` (9), `retencion_cancelacion_pct` (50.00), `reprogramacion_minima_d` (21), `sla_respuesta_dh` (3), `sla_atraso_dh` (5), `limite_boletos` (10), `actualizado_por_id` (FK `usuario`, N), `actualizado_en`.
 
-* `CHECK` de valores positivos (incluido `margen_50_50_d > 0`, que garantiza umbral `> corte`). Los cambios se auditan y **no** afectan registros ya emitidos: cada consumidor guarda su propio *snapshot*.
+* `CHECK`s de integridad: `cierre_web_min >= 0`, `cierre_taquilla_min >= 0`, `retencion_cancelacion_pct BETWEEN 0.00 AND 100.00`, `limite_boletos >= 1`, `sla_atraso_dh > sla_respuesta_dh` y resto `> 0` (incluido `margen_50_50_d > 0`, que garantiza umbral `> corte`). Los cambios se auditan y **no** afectan registros ya emitidos (la modificación de `limite_boletos` aplica exclusivamente a operaciones nuevas hacia adelante): cada consumidor guarda su propio *snapshot*.
 
 #### `turno`
 | Columna | Tipo | Notas |
@@ -215,7 +215,7 @@ Raíz de la estructura física y recurso que se reserva en la agenda (por eso `b
 | :---- | :---- | :---- |
 | id | BIGINT | PK |
 | nombre | TEXT | UQ |
-| aforo | INTEGER | `CHECK (aforo > 0)`. 1,728 para el teatro; tope de asistentes en cotizaciones |
+| aforo | INTEGER | `CHECK (aforo > 0)`. 1,730 para el teatro; tope de asistentes en cotizaciones |
 | activa | BOOLEAN | |
 
 * Las tarifas de turno y los parámetros siguen siendo globales; si en el futuro una sala nueva tuviera tarifas propias, `turno` recibiría un `sala_id`.
@@ -244,7 +244,7 @@ Cabina de la sección Palcos. Es la unidad mínima de subdivisión en esa secci�
 * `UQ (seccion_id, codigo)`, `UQ (id, seccion_id)`.
 
 #### `butaca`
-Catálogo físico de las 1,728 butacas. No tiene estado: la disponibilidad depende de la función.
+Catálogo físico de las 1,730 butacas. No tiene estado: la disponibilidad depende de la función.
 
 | Columna | Tipo | Notas |
 | :---- | :---- | :---- |
@@ -334,11 +334,11 @@ Une *Solicitud_Renta*, *Cotización* y *Reserva_renta* de la versión 5.3. No se
 | nombre_evento | TEXT | |
 | categoria_id | BIGINT | FK `categoria` |
 | modalidad | TEXT | `COMERCIAL`, `PUBLICO`, `PRIVADO` |
-| asistentes_estimados | INTEGER | `CHECK (> 0)`; el tope es `sala.aforo` (1,728), validado en el servicio |
+| asistentes_estimados | INTEGER | `CHECK (> 0)`; el tope es `sala.aforo` (1,730), validado en el servicio |
 | contacto_nombre, contacto_telefono, contacto_correo | TEXT | Datos para la cotización |
 | es_multidia | BOOLEAN | |
 | subtotal_estimado | NUMERIC(10,2) | Informativo, calculado al enviar |
-| estado | TEXT | `EN_REVISION`, `PROPUESTA_RETENIDA`, `PROPUESTA_EXPIRADA`, `PRE_RESERVADO`, `CONFIRMADO`, `EXPIRADA_SIN_PAGO`, `EXPIRADA_POR_FECHA`, `PAGO_EXTEMPORANEO_EN_REVISION`, `RECHAZADA`, `CANCELADO_POR_ARRENDATARIO`, `CANCELADO_POR_TEATRO`, `FINALIZADO` |
+| estado | TEXT | `EN_REVISION`, `PROPUESTA_RETENIDA`, `PROPUESTA_EXPIRADA`, `PRE_RESERVADO`, `CONFIRMADO`, `EXPIRADA_SIN_PAGO`, `EXPIRADA_POR_FECHA`, `PAGO_EXTEMPORANEO_EN_REVISION`, `RECHAZADA`, `CANCELADO_POR_ARRENDATARIO`, `CANCELADO_POR_TEATRO`, `CANCELADA_REPROGRAMABLE`, `FINALIZADO` |
 | enviada_en | TIMESTAMPTZ | Base para el SLA |
 | respondida_en | TIMESTAMPTZ | N (ciclo de vida) |
 | aprobada_en | TIMESTAMPTZ | N (ciclo de vida) |
@@ -666,7 +666,7 @@ Idea clave: **`seccion_evento` es una zona de precio, no una etiqueta visual.** 
 
 | Caso | `seccion_evento` | `fase_venta` | `precio_seccion` |
 | :---- | :---- | :---- | :---- |
-| **0. Precio único fijo** (todo el recinto, un precio todo el periodo) | 1: "General" con las 1,728 butacas | 1: "Venta general" | 1 fila |
+| **0. Precio único fijo** (todo el recinto, un precio todo el periodo) | 1: "General" con las 1,730 butacas | 1: "Venta general" | 1 fila |
 | **1. Precio único que cambia por fecha** (Marco Barrientos) | 1: "General" con todas las butacas | 2: "Preventa" desde el 1 de septiembre, "General" desde el 1 de noviembre | 2 filas: $350 y $500 |
 | **2. Precio por sección, fijo todo el periodo** | N: por ejemplo Luneta, Platea, Palcos… | 1: "Venta general" | N filas, una por sección |
 | **3. Precio por sección y por fecha** | N | M | N × M filas |
@@ -693,7 +693,7 @@ Idea clave: **`seccion_evento` es una zona de precio, no una etiqueta visual.** 
 * FK compuesta `(evento_id, butaca_id) → asignacion_butaca(evento_id, butaca_id)`: solo existen filas de butacas que tienen sección del evento, y por lo tanto precio.
 * `UQ (funcion_id, butaca_id)`, `UQ (id, funcion_id)`.
 * El *polling* sigue siendo `SELECT butaca_id, estado FROM disponibilidad_butaca WHERE funcion_id = ?`, sin `JOIN`.
-* Se crean filas solo para butacas de secciones habilitadas (no siempre 1,728); `arquitectura.md` ya lo refleja. En el mapa, una butaca sin fila se pinta como "sección deshabilitada".
+* Se crean filas solo para butacas de secciones habilitadas (no siempre 1,730); `arquitectura.md` ya lo refleja. En el mapa, una butaca sin fila se pinta como "sección deshabilitada".
 
 #### `bloqueo_tecnico`
 Historial de bloqueos técnicos. Una butaca puede bloquearse y liberarse varias veces.
@@ -723,7 +723,7 @@ Une *Carrito* y *Transacción* de la versión 5.3: son el mismo objeto en distin
 | canal | TEXT | `LINEA`, `TAQUILLA` |
 | usuario_id | BIGINT | FK `usuario`, N. Comprador en línea |
 | cajero_id | BIGINT | FK `usuario`, N. Cajero en taquilla |
-| estado | TEXT | `APARTADO`, `PAGO_EN_PROCESO`, `PAGADA`, `EXPIRADA`, `REEMBOLSADA_AUTOMATICA` |
+| estado | TEXT | `APARTADO`, `PAGO_EN_PROCESO`, `PAGADA`, `EXPIRADA`, `REEMBOLSADA_AUTOMATICA`, `ANULADA` |
 | expira_en | TIMESTAMPTZ | Primer asiento + 10 min |
 | gracia_hasta | TIMESTAMPTZ | N. Se llena al pasar a `PAGO_EN_PROCESO` |
 | pagada_en | TIMESTAMPTZ | N (ciclo de vida) |
@@ -862,7 +862,7 @@ Subtipo de `boleto` con 3 atributos propios.
 ### **Se aparta de la auditoría (más tablas, a propósito)**
 
 * **A. `orden_compra_detalle` se conserva.** Sin ella, al expirar una orden se pierde qué butacas tenía, y el flujo de pago tardío no puede verificar si "el 100% de las butacas de la orden siguen disponibles". Además permite el índice parcial "una butaca, una orden activa" y la FK compuesta "una sola función por orden".
-* **B. `asignacion_butaca` se conserva** (la auditoría pedía eliminar `Asiento_evento`). Con la llave `(evento_id, butaca_id)` la base impide solapamientos y huecos dobles; con solo rangos geométricos, eso dependería de código. El costo son ~1,728 filas por evento comercial, que para PostgreSQL es poco. El *polling* no se ve afectado porque lee solo `disponibilidad_butaca`.
+* **B. `asignacion_butaca` se conserva** (la auditoría pedía eliminar `Asiento_evento`). Con la llave `(evento_id, butaca_id)` la base impide solapamientos y huecos dobles; con solo rangos geométricos, eso dependería de código. El costo son ~1,730 filas por evento comercial, que para PostgreSQL es poco. El *polling* no se ve afectado porque lee solo `disponibilidad_butaca`.
 * **C. Historiales en tablas propias:** `bloqueo_tecnico`, `reprogramacion_funcion`, `resolucion_vencimiento`, `contingencia_funcion`, `aceptacion_legal`. La auditoría proponía columnas en la tabla padre; eso solo guarda el último cambio.
 * **D. Subtipos en tablas propias:** `cortesia`, `ficha_pago`, `cotizacion_parametros`, `cancelacion_arrendamiento`, `revision_pago_extemporaneo`. Evitan columnas vacías en la mayoría de las filas.
 * **E. `cotizacion_servicio` sin `servicio_id` opcional.** La auditoría hacía opcional el servicio para meter la renta por turno en el mismo detalle; aquí la renta se queda en `bloque_solicitado.tarifa_aplicada` y cada tabla tiene una sola responsabilidad.
@@ -903,7 +903,7 @@ Subtipo de `boleto` con 3 atributos propios.
 
 * **4. No se incluyen `cartera`, `metodo_pago_guardado` ni `metodo_pago`.** Guardar tarjetas no está en el alcance y aumenta la exposición a datos sensibles; Stripe ya las maneja. El método queda como enumeración en cada pago.
 * **5. `rol` + `usuario_rol` se reemplazan por la columna `usuario.rol`,** porque cada cuenta tiene un solo rol.
-* **6. `disponibilidad_butaca` apunta a `asignacion_butaca`** igual que en la propuesta (solo existen filas de butacas con sección del evento). `arquitectura.md` ya refleja que no siempre son 1,728 filas.
+* **6. `disponibilidad_butaca` apunta a `asignacion_butaca`** igual que en la propuesta (solo existen filas de butacas con sección del evento). `arquitectura.md` ya refleja que no siempre son 1,730 filas.
 
 ### **Se conserva de la propuesta *Copia ER teatro***
 
@@ -963,7 +963,7 @@ Subtipo de `boleto` con 3 atributos propios.
 
 ## **9. Pendientes**
 
-1. Definir el desglose real de filas, columnas, palcos y butacas accesibles que suman 1,728, y la puerta de acceso de cada sección (para `seed_teatro.py`).
+1. El desglose físico oficial de 1,730 butacas ha quedado consolidado en `docs/aforo_preliminar.json` (Luneta 566, Platea 144, Mezzanine 291, Primer Piso 287, Segundo Piso 386 y Palcos 56 en 12 cabinas, con 12 accesibles incluidas). Resta validar únicamente la asignación específica de puertas de acceso por sección para `seed_teatro.py`.
 2. Confirmar si una fase de venta puede variar por función (hoy aplica a todo el evento).
 
 ---

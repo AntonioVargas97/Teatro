@@ -1,4 +1,5 @@
 @startuml ME03_Orden_Compra
+' Alineado con BD v6.2 y Contrato API v1
 ' Actualizado 2026-11-26: alineado con BD v6.2. Estados financieros derivados (no columnas), PagoOrden/PagoArrendamiento, webhook_stripe, contingencia_funcion por tabla, cotizacion_version al aprobar, asignacion_butaca para el inventario.
 hide empty description
 skinparam state {
@@ -19,6 +20,9 @@ PAGO_EN_PROCESO --> EXPIRADA : Vence gracia_hasta sin confirmación\n/ cancela P
 
 EXPIRADA --> PAGADA : Webhook Stripe tardío OK\n[now() <= fin_en, función no cancelada,\n100% butacas DISPONIBLE y <= 10 acumulados]\n/ reasigna atómicamente y emite boletos QR
 EXPIRADA --> REEMBOLSADA_AUTOMATICA : Webhook Stripe tardío OK\n[>= 1 butaca ocupada, > 10 acumulados\no función cerrada/cancelada]\n/ reembolso_orden + refund 100% Stripe + correo
+
+PAGADA --> ANULADA : Admin anula orden TAQUILLA [T-3.9]\n[0 boletos usados, función vigente]\n/ invalida boletos, libera butacas a DISPONIBLE\ny reembolso presencial en ventanilla
+ANULADA --> [*]
 
 note right of PAGADA
   Si el evento se cancela posteriormente,

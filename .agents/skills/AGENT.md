@@ -6,9 +6,10 @@ Este repositorio usa skills complementarias bajo `.agents/skills/`. Cuando dos g
 
 1. **Reglas de negocio y arquitectura del proyecto (Máxima prioridad):**
    - `teatro-reglas-negocio`, `django-teatro-backend`, `react-teatro-frontend` y `playwright-vitest-teatro` reflejan las decisiones oficiales de `docs/alcance.md`, `docs/arquitectura.md`, `docs/stack-tecnologico.md` y `docs/maquinas-de-estado.md`.
-2. **Límite estricto para `frontend-design`:**
-   - `frontend-design` **únicamente define la estética visual** (paleta de colores, tipografía, espaciado, jerarquía visual y estilo de componentes).
-   - `frontend-design` **NO puede modificar, reescribir ni ocultar textos obligatorios de negocio** (como los mensajes exactos del escáner QR en `ValidarAccesoPage.tsx`, avisos legales LFPDPPP o etiquetas compuestas `{Sección} - {Nombre}`), **ni sacrificar la claridad, contraste o legibilidad operativa del mapa de `1,728` butacas**, sus `5` estados + asientos accesibles, el carrito, la taquilla o las vistas móviles desde `360px`.
+2. **Precedencia de `teatro-design-system` y límite de `frontend-design`:**
+   - `teatro-design-system` es el sistema visual oficial del recinto (Azul Golfo, Arena Cálida, Cinzel + Manrope, 3 superficies, invariante de 1,730 butacas) y **TIENE PRECEDENCIA ABSOLUTA** sobre `frontend-design`.
+   - `frontend-design` actúa como apoyo estético secundario y **queda estrictamente subordinado** a `teatro-design-system`.
+   - `frontend-design` **NO puede modificar, reescribir ni ocultar textos obligatorios de negocio** (como los mensajes exactos del escáner QR en `ValidarAccesoPage.tsx`, avisos legales LFPDPPP o etiquetas compuestas `{Sección} - {Nombre}`), **ni sacrificar la claridad, contraste o legibilidad operativa del mapa de `1,730` butacas**, sus `5` estados + asientos accesibles, el carrito, la taquilla o las vistas móviles desde `360px`.
 3. **Seguridad (`security-audit`):**
    - En trabajo cotidiano aplica en modo guía (respaldando RBAC, anti-IDOR, cookies `HttpOnly`/CSRF y firmas de Stripe/QR); solo ejecuta el flujo completo de auditoría cuando el usuario lo solicite explícitamente.
 4. **Control de versiones (`git-workflow`):**

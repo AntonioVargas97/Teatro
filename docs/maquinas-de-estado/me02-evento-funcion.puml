@@ -1,4 +1,5 @@
 @startuml ME02_Evento_Funcion
+' Alineado con BD v6.2 y Contrato API v1
 ' Actualizado 2026-11-26: alineado con BD v6.2. Estados financieros derivados (no columnas), PagoOrden/PagoArrendamiento, webhook_stripe, contingencia_funcion por tabla, cotizacion_version al aprobar, asignacion_butaca para el inventario.
 hide empty description
 skinparam state {
@@ -16,7 +17,8 @@ state "Ciclo de Vida del EVENTO" as Ev {
   PENDIENTE_PUBLICACION --> CANCELADO_POR_ARRENDATARIO : Cancelación / incumple D-21
   PENDIENTE_PUBLICACION --> CANCELADO_POR_TEATRO : Cancelación Teatro / Directo
 
-  VENCIDO_SIN_PUBLICAR --> PUBLICADO : Admin apoya (1) o concede\nprórroga (2) y aprueba
+  VENCIDO_SIN_PUBLICAR --> PUBLICADO : Admin apoya capturando póster/tarifas\n(opción 1) y aprueba [T-2.5a]
+  VENCIDO_SIN_PUBLICAR --> PENDIENTE_PUBLICACION : Admin concede prórroga (opción 2) [T-2.5b]\n[actualiza fecha_limite_publicacion]
   VENCIDO_SIN_PUBLICAR --> OPERACION_SIN_CARTELERA : Admin autoriza operar\nsin venta web / cartelera (3)
   VENCIDO_SIN_PUBLICAR --> CANCELADO_POR_ARRENDATARIO : Admin cancela arrendamiento (4)
   VENCIDO_SIN_PUBLICAR --> CANCELADO_POR_TEATRO : Admin cancela Evento Directo (4)

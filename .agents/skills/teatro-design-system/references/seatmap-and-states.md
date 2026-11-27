@@ -1,30 +1,30 @@
-# Plano de 1,728 Butacas, Estados UI y Veredictos QR
+# Plano de 1,730 Butacas, Estados UI y Veredictos QR
 
 Referencia oficial extraída de `js/core/config-store.js`, `js/plano-teatro-svg.js`, `js/components/seat-map.js`, `js/core/state-machines.js` y `js/views/verificador.js`.
 
 ---
 
-## 1. Invariante Arquitectónico: 6 Secciones y 1,728 Butacas Oficiales
+## 1. Invariante Arquitectónico: 6 Secciones y 1,730 Butacas Oficiales
 
 Nunca cambies estos identificadores, conteos ni colores estructurales en el plano SVG ni en los configuradores:
 
 | ID Sección | Nombre Oficial | Color Hex | Butacas | Precio Base Sugerido (MXN) | Bloques / Filas clave |
 | :--- | :--- | :--- | :---: | :---: | :--- |
-| `luneta` | **Luneta** | `#DC2626` | `564` | `$650` | Filas `Q` a `A`, más `AA` y `BB` (`IZQUIERDO`, `CENTRAL`, `DERECHO`) |
+| `luneta` | **Luneta** | `#DC2626` | `566` | `$650` | Filas `Q` a `A`, más `AA` y `BB` (`IZQUIERDO`, `CENTRAL`, `DERECHO`) |
 | `platea` | **Platea** | `#EA580C` | `144` | `$520` | Filas `O` a `A` en laterales (`IZQUIERDO` y `DERECHO`) |
 | `mezzanine` | **Mezzanine** | `#1E3A8A` | `291` | `$480` | Filas `X` a `R` (`IZQUIERDO`, `CENTRAL`, `DERECHO`) |
 | `primer-piso` | **Primer Piso** | `#15803D` | `287` | `$380` | Filas `G` a `A` (41 asientos por fila) |
 | `segundo-piso` | **Segundo Piso** | `#7E22CE` | `386` | `$300` | Filas `K` a `A` |
 | `palcos` | **Palcos** | `#0284C7` | `56` | `$580` | 12 cabinas completas: Nivel 1 (`P1`–`P5`, `P8`: 28) y Nivel 2 (`P9`–`P14`: 28) |
 
-- **Suma verificada:** `564 + 144 + 291 + 287 + 386 + 56 = 1,728` localidades exactas.
+- **Suma verificada:** `566 + 144 + 291 + 287 + 386 + 56 = 1,730` localidades exactas.
 - **Localidades accesibles (`♿`, 12 en total + 6 acompañantes):**
   - `luneta`: `BB-1`, `BB-2`, `BB-25`, `BB-26`, `A-1`, `A-2`, `A-29`, `A-30`
   - `platea`: `A-1`, `A-2`, `A-5`, `A-6`
   - Deben distinguirse visualmente con contorno exterior azul (`#0284C7`) y punto identificador, además de marcarse explícitamente en leyenda y resumen.
 
 ### Reglas de Zoom e Interacción del Plano SVG (`viewBox="0 0 1100 940"`)
-- **Umbral LOD semántico (`ZOOM_SEAT_THRESHOLD = 1.7`):** por debajo de `1.7x` se muestran las 6 macro-secciones sólidas con su nombre, aforo y rango tarifario; al llegar a `>= 1.7x` las macro-formas bajan a `fill-opacity="0.16"` y aparecen las **1,728 butacas individuales**. Escala máxima `4.5x`.
+- **Umbral LOD semántico (`ZOOM_SEAT_THRESHOLD = 1.7`):** por debajo de `1.7x` se muestran las 6 macro-secciones sólidas con su nombre, aforo y rango tarifario; al llegar a `>= 1.7x` las macro-formas bajan a `fill-opacity="0.16"` y aparecen las **1,730 butacas individuales**. Escala máxima `4.5x`.
 - **4 modos de operación soportados por el componente del plano:** `public`, `taquilla`, `admin-sala` y `configurator`.
 - **Configurador tarifario (`configurador.html`):** configuración de secciones del evento (conservación 6 secciones, sección única, agrupación o subdivisión de hasta ≤ 6 por sección oficial) y fases de venta consecutivas, con piso `>= $100.00 MXN`, cobertura `100%` sin butacas huérfanas y nombre único por evento. Al publicar el evento, la configuración se congela.
 

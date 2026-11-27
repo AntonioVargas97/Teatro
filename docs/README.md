@@ -10,7 +10,7 @@ Alcance, requerimientos, arquitectura, tecnología, modelo de datos, máquinas d
 - `contrato-api.md`: contrato REST `/api/v1/` (rutas, esquemas JSON, errores `code`, throttling y webhooks).
 - `modelo-datos.md`: modelo relacional v6.2 (44 tablas, 6 módulos base y 5 de dominio).
 - `modelado_datos/`: diagramas `Teatro_MR_v6.2.drawio` (modelo relacional) y `Teatro_ER_Chen_v6.2.drawio` (entidad-relación en notación Chen).
-- `informe-cambios-modelo-datos.md`: informe de cambios de la v5.3 a la v6.2.
+- `reportes/informe-cambios-modelo-datos.md`: informe de cambios de la v5.3 a la v6.2.
 - `maquinas-de-estado.md` y `maquinas-de-estado/`: estados, guardas y transiciones, con diagramas `me01` a `me04`.
 - `diagramas-uml/`: diagramas de clases, enumeraciones, casos de uso (`01`–`10`), robustez (`RB01`–`RB10`) y secuencia (`SD01`–`SD10`) en PlantUML (UML 2.5.1).
 - `plan-pruebas.md`: plan maestro de pruebas ISO/IEC/IEEE 29119-3 con RTM completa (`RF`, `RNF`, transiciones y `SD`), concurrencia y técnicas avanzadas.

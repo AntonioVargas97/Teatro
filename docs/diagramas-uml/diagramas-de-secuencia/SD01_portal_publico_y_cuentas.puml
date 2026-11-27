@@ -1,4 +1,5 @@
 @startuml SD01_portal_publico_y_cuentas
+' Alineado con BD v6.2 y Contrato API v1
 skinparam shadowing false
 skinparam sequenceMessageAlign left
 skinparam responseMessageBelowArrow true
@@ -94,7 +95,7 @@ UI --> V : Muestra ficha del evento
 opt [modalidad == COMERCIAL]
   V -> UI : Abre mapa de una función (SeleccionButacasPage)
   UI -> INV_CTL ++ : GET /api/v1/inventario/funciones/{id}/mapa/
-  INV_CTL -> E_DIS : leer 1,728 butacas, fase_venta_id y precios
+  INV_CTL -> E_DIS : leer 1,730 butacas, fase_venta_id y precios
   INV_CTL --> UI -- : 200 {funcion_id, fase_venta_id, precios, butacas} + ETag
   UI --> V : Renderiza mapa (al intentar apartar sin sesión, redirige a LoginPage)
 end

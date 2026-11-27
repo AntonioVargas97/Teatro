@@ -1,4 +1,5 @@
 @startuml SD02_venta_boletos_en_linea
+' Alineado con BD v6.2 y Contrato API v1
 skinparam shadowing false
 skinparam sequenceMessageAlign left
 skinparam responseMessageBelowArrow true
@@ -20,6 +21,7 @@ entity "Usuario" as E_USR
 entity "OrdenCompra" as E_OC
 entity "DisponibilidadButaca" as E_DIS
 entity "OrdenCompraDetalle" as E_OCD
+entity "PagoOrden" as E_PO
 entity "Boleto" as E_BOL
 entity "WebhookStripe" as E_WH
 participant "Stripe Sandbox" as ST <<sistema>>
@@ -80,7 +82,7 @@ critical [transacción corta · validar vigencia y pasar a PAGO_EN_PROCESO]
 end
 VTA_CTL -> ST ++ : crear o reutilizar PaymentIntent (fuera de lock BD)
 ST --> VTA_CTL -- : client_secret
-VTA_CTL -> E_OC : guardar payment_intent_id
+VTA_CTL -> E_PO : registrar stripe_payment_intent_id en PagoOrden
 VTA_CTL --> UI -- : 200 {orden_id, estado, gracia_hasta, total, client_secret}
 UI -> ST : confirmar tarjeta con Stripe Elements
 ST ->> PAG_CTL : POST /api/v1/pagos/webhooks/stripe/ (Stripe-Signature)

@@ -22,7 +22,7 @@ Toda prueba diseñada o ejecutada debe alinearse estrictamente con los artefacto
 | Diagramas UML | `docs/diagramas-uml/` | 10 diagramas de casos de uso (`01`–`10`), robustez (`RB01`–`RB10`), secuencia (`SD01`–`SD10`) y clases. |
 
 ### 1.2. Objetivos de Calidad Verificables
-1. **Cero sobreventa y cero empalmes (`0%`):** Garantizar mediante pruebas multihilo reales en PostgreSQL que ninguna localidad de las `1,728` butacas pueda asignarse dos veces ni ningún bloque en `BloqueoAgenda` pueda traslaparse.
+1. **Cero sobreventa y cero empalmes (`0%`):** Garantizar mediante pruebas multihilo reales en PostgreSQL que ninguna localidad de las `1,730` butacas pueda asignarse dos veces ni ningún bloque en `BloqueoAgenda` pueda traslaparse.
 2. **Integridad financiera y temporal:** Verificar con exactitud `Decimal(10, 2)` en MXN (`ROUND_HALF_UP`) y cortes evaluados en `America/Mexico_City` con persistencia UTC (`TIMESTAMPTZ`).
 3. **Aislamiento de seguridad y RBAC:** Verificar separación estricta entre `Visitante`, `USUARIO`, `CAJERO`, `VERIFICADOR` y `ADMIN`, cookies `HttpOnly` + CSRF, anti-IDOR/BOLA y validación criptográfica de `Stripe-Signature` y `QR_HMAC_SECRET`.
 4. **Resiliencia ante entradas anómalas y mutaciones:** Complementar la pirámide tradicional con **Property-Based Testing**, **API Fuzzing**, **Pruebas Metamórficas**, **Pruebas Diferenciales**, **Mutación**, **Evals Deterministas** y **Revisión Adversarial Multi-Agente**.
@@ -45,7 +45,7 @@ En correspondencia con [alcance.md](alcance.md) §4 y [stack-tecnologico.md](sta
 | `R-07` | Desfase de zona horaria (`UTC` vs `America/Mexico_City`) en `D-21 23:59:59`, `-30 min`, `-2 h` | `cotizaciones`, `ventas`, `boletos` | Alta | Alto | **P1** | Pruebas unitarias con `timezone.now` mockeado en cambio de día y cruce de medianoche. |
 | `R-08` | Ruptura de esquema de BD (faltan FKs compuestas, `CASCADE` indebido o FK hacia capa superior) | Todos | Baja | Crítico | **P0** | Pruebas de introspección `pg_constraint`, `on_delete=PROTECT`, cross-layer FK y `import-linter`. |
 | `R-09` | Caída `500 Internal Server Error` ante JSON corrupto, archivos `> 5 MB` o caracteres inválidos | API `/api/v1/` | Media | Alto | **P1** | API Fuzzing con `Schemathesis` sobre esquema OpenAPI (`drf-spectacular`). |
-| `R-10` | Regresión en subdivisión del plano de `1,728` butacas (solapes, huérfanas o palcos partidos) | `cartelera`, `frontend` | Media | Alto | **P1** | `fast-check` (PBT), prueba metamórfica `MR-1`, Playwright en 360 px y escritorio. |
+| `R-10` | Regresión en subdivisión del plano de `1,730` butacas (solapes, huérfanas o palcos partidos) | `cartelera`, `frontend` | Media | Alto | **P1** | `fast-check` (PBT), prueba metamórfica `MR-1`, Playwright en 360 px y escritorio. |
 | `R-11` | Eliminación física o alteración de `RegistroAuditoria` / `CotizacionVersion` | `auditoria`, `cotizaciones`, `ventas` | Baja | Crítico | **P0** | Pruebas de permisos PostgreSQL del rol `teatro_app` (`REVOKE UPDATE, DELETE`) + anulación auditada. |
 | `R-12` | Desincronización de caché Redis / `ETag` en cambio de `FaseVenta` | `inventario`, `cartelera` | Media | Medio | **P2** | Pruebas de integración con Redis verificando invalidación `on_commit` y `200` vs `304`. |
 
@@ -94,7 +94,7 @@ Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`),
 | RF | Transiciones / Reglas | Endpoint(s) | Niveles y Técnicas de Prueba |
 | :--- | :--- | :--- | :--- |
 | `RF-24` | Extras por `unidad_cobro`, montaje/ensayos sin cargo extra | `GET configuracion/catalogos/`, `POST cotizaciones/estimaciones/` | `TestCase`, `Hypothesis`, **`Diferencial` (TS vs Python)** |
-| `RF-25` | `asistentes <= 1,728`, multi-día, sin bloquear agenda | `POST cotizaciones/`, `PUT cotizaciones/{id}/poster/` | `TestCase`, `Schemathesis`, `Playwright` (`cotizacion.spec.ts`) |
+| `RF-25` | `asistentes <= 1,730`, multi-día, sin bloquear agenda | `POST cotizaciones/`, `PUT cotizaciones/{id}/poster/` | `TestCase`, `Schemathesis`, `Playwright` (`cotizacion.spec.ts`) |
 | `RF-26` | Anti-IDOR propietario + PDF comprobante | `GET cotizaciones/`, `GET cotizaciones/{id}/`, `GET cotizaciones/{id}/comprobante/` | `TestCase` (ReportLab PDF + `403` ajeno), `Red Team` |
 | `RF-27` | SLA `3/5 días hábiles` lun–vie `America/Mexico_City` | `GET cotizaciones/` + tarea `actualizar_sla_cotizaciones` | `TestCase` (`timezone.now` saltando fines de semana), `Evals` |
 | `RF-28` | `T-1.4` (`EXPIRADA_POR_FECHA`) | Tarea Celery Beat `actualizar_sla_cotizaciones` | `TestCase` (fecha estimada pasada) |
@@ -107,7 +107,7 @@ Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`),
 | `RF-35` | `T-1.3` (rechaza todas -> `PROPUESTA_EXPIRADA`) | `POST cotizaciones/{id}/responder-alternativas/` | `TestCase` |
 | `RF-36` | `T-1.3` (expiración automática `48 h`) | Tarea Celery Beat `expirar_retenciones_agenda` | `TestCase` (`timezone.now` `+48 h + 1 s`) |
 | `RF-37` | Pago tarjeta (`ANTICIPO_50`, `SALDO_50`, `TOTAL_100`) + `Idempotency-Key` | `POST cotizaciones/{id}/pagos/` | `TestCase` (mock `StripeAdapter`), `Playwright`, `Red Team` |
-| `RF-38` | Fichas `SPEI`/`FICHA_EFECTIVO`, bloqueo `48 h` pre-`D-21`, tope efectivo | `POST cotizaciones/{id}/pagos/` | `TestCase` (`409 METODO_NO_DISPONIBLE`), `Hypothesis`, `Evals` |
+| `RF-38` | Fichas `FICHA_SPEI`/`FICHA_EFECTIVO`, bloqueo `48 h` pre-`D-21`, tope efectivo | `POST cotizaciones/{id}/pagos/` | `TestCase` (`409 METODO_NO_DISPONIBLE`), `Hypothesis`, `Evals` |
 | `RF-39` | `T-1.7` (webhook idempotente -> `CONFIRMADO`) | `POST pagos/webhooks/stripe/` | `TestCase` (firma HMAC + reentrega idempotente), `Red Team` |
 | `RF-40` | `T-1.8` (`PRE_RESERVADO` -> `EXPIRADA_SIN_PAGO`) | Tarea Celery Beat `expirar_retenciones_agenda` | `TestCase` |
 | `RF-41` | `T-1.9` (`PAGO_EXTEMPORANEO_EN_REVISION`, `72 h`) | `POST pagos/webhooks/stripe/` | `TestCase`, `TransactionTestCase` |
@@ -116,8 +116,8 @@ Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`),
 | `RF-44` | `T-1.13` (`SALDO_50` antes `D-21 23:59:59`) | `POST pagos/webhooks/stripe/` | `TestCase` (límite exacto `23:59:59` vs `00:00:00` en `America/Mexico_City`) |
 | `RF-45` | Solicitud estructurada de cancelación (`CANCELACION`) | `POST cotizaciones/{id}/cambios/` | `TestCase` (anti-IDOR) |
 | `RF-46` | `T-1.15` (`CANCELADO_POR_ARRENDATARIO`, retención `50%/100%`, incumplimiento `D-21`) | `POST cotizaciones/{id}/cambios/{cambio_id}/resolver/`, Celery `verificar_incumplimiento_saldo` | `TestCase`, `Evals` (tabla 21 d), `mutmut` |
-| `RF-47` | `T-1.16` (`CANCELADO_POR_TEATRO`) | `POST cotizaciones/{id}/cambios/{cambio_id}/resolver/`, `POST cartelera/eventos/{id}/cancelar/` | `TestCase` |
-| `RF-48` | Elección `REEMBOLSO_EXTERNO` o `REPROGRAMACION` | `POST cotizaciones/{id}/eleccion-cancelacion/` | `TestCase` (anti-IDOR) |
+| `RF-47` | `T-1.16a/b/c` (`CANCELADA_REPROGRAMABLE`) (`CANCELADO_POR_TEATRO`) | `POST cotizaciones/{id}/cambios/{cambio_id}/resolver/`, `POST cartelera/eventos/{id}/cancelar/` | `TestCase` |
+| `RF-48` | Elección `REEMBOLSO` o `REPROGRAMACION` | `POST cotizaciones/{id}/eleccion-cancelacion/` | `TestCase` (anti-IDOR) |
 | `RF-49` | Solicitud reprogramación gratuita (`>= 21 d`, 1ra vez) | `POST cotizaciones/{id}/cambios/` | `TestCase` |
 | `RF-50` | `T-1.14`, `T-1.17` (reprogramación atómica, recálculo `D-21`, `409 SALDO_PENDIENTE`, `FINALIZADO`) | `POST cotizaciones/{id}/cambios/{cambio_id}/resolver/` | `TransactionTestCase` (atomicidad `AgendaService`), `Evals` |
 
@@ -135,9 +135,9 @@ Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`),
 | `RF-59` | Configuración tarifaria por `ADMIN` antes de publicar | `PUT cartelera/eventos/{id}/tarifario/` | `TestCase` |
 | `RF-60` | Fórmula determinista `min(inicio, max(D-15, pago+3d))` | `CarteleraService` | `TestCase`, **`Evals`**, `Hypothesis` |
 | `RF-61` | `T-2.3` (compuerta publicación, `409 REQUISITOS_PENDIENTES`) | `POST cartelera/eventos/{id}/publicar/` | `TestCase` (falta póster / tarifa / pago), `Playwright` |
-| `RF-62` | `T-2.3`, `T-4.1` (`bulk_create` `DisponibilidadButaca` + `409 TARIFARIO_CONGELADO`) | `POST cartelera/eventos/{id}/publicar/` | `TestCase` (`1,728` filas y bloqueo de edición posterior), `MR-1` |
+| `RF-62` | `T-2.3`, `T-4.1` (`bulk_create` `DisponibilidadButaca` (filas asignadas ≤ 1,730) + `409 TARIFARIO_CONGELADO`) | `POST cartelera/eventos/{id}/publicar/` | `TestCase` (`1,730` filas y bloqueo de edición posterior), `MR-1` |
 | `RF-63` | `T-2.4` (`VENCIDO_SIN_PUBLICAR`, conserva agenda) | Tarea Celery Beat `verificar_limite_publicacion` | `TestCase` |
-| `RF-64` | `T-2.5`, `T-2.6`, `T-2.7` (4 acciones auditadas) | `POST cartelera/eventos/{id}/resolver-vencimiento/` | `TestCase`, `Evals` |
+| `RF-64` | `T-2.5a` y `T-2.5b`, `T-2.6`, `T-2.7` (4 acciones auditadas) | `POST cartelera/eventos/{id}/resolver-vencimiento/` | `TestCase`, `Evals` |
 | `RF-65` | `T-2.9`, `T-2.10` (`REPROGRAMADO` a nivel Función, conserva QR y evento padre) | `POST cartelera/funciones/{id}/reprogramar/` | `TransactionTestCase` (agenda atómica + preservación de `Boleto`) |
 | `RF-66` | `T-2.8`, `T-4.8` (cierra canales, invalida QRs, `liberar_agenda` explícito) | `POST cartelera/eventos/{id}/cancelar/` | `TestCase` (causa `DIRECTO` solo `TEATRO`) |
 | `RF-67` | `T-4.4` (`DISPONIBLE -> BLOQUEO_TECNICO`, lote atómico) | `GET/POST inventario/funciones/{id}/bloqueos/` | `TestCase` (lote con 1 ocupada -> `409` y rollback) |
@@ -151,7 +151,7 @@ Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`),
 | `RF-71` | Solo `Comercial`/`Público` en `PUBLICADO` (oculta `Privado`/pendientes) | `GET cartelera/eventos/` | `TestCase`, `Vitest`, `Playwright` |
 | `RF-72` | Filtros `fecha`, `categoria_id` (`400` si inválido) | `GET cartelera/eventos/`, `GET cartelera/categorias/` | `TestCase` (`django-filter`), `Schemathesis`, `Vitest` |
 | `RF-73` | Detalle público (`404` si `Privado` o no publicado) | `GET cartelera/eventos/{id}/`, `GET cartelera/funciones/{id}/` | `TestCase`, `Red Team` |
-| `RF-74` | `1,728` butacas, 5 estados, `ETag`/`304`, `Cache-Control`, cambio de fase | `GET recinto/salas/{id}/plano/`, `GET inventario/funciones/{id}/mapa/`, `.../disponibilidad/` | `TestCase` (Redis invalidation), `Vitest` (360 px + `React.memo`), **`fast-check`** |
+| `RF-74` | `1,730` butacas, 5 estados, `ETag`/`304`, `Cache-Control`, cambio de fase | `GET recinto/salas/{id}/plano/`, `GET inventario/funciones/{id}/mapa/`, `.../disponibilidad/` | `TestCase` (Redis invalidation), `Vitest` (360 px + `React.memo`), **`fast-check`** |
 
 ### 3.7. Módulo 7 — Venta de Boletos en Línea (`SD02`)
 | RF | Transiciones / Reglas | Endpoint(s) | Niveles y Técnicas de Prueba |
@@ -208,7 +208,7 @@ Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`),
 | `RNF-05` | Eficiencia de Desempeño | Polling `10–15 s`, pausa `visibilityState`, `React.memo` | `Vitest` + `React Testing Library` |
 | `RNF-06` | Eficiencia de Desempeño | Paginación `20` (`1..100`), `django-filter -> 400` | `TestCase`, `Schemathesis` |
 | `RNF-07` | Eficiencia de Desempeño | `6m` Nginx, póster `<= 5 MB`, `MAX_IMAGE_PIXELS` | `TestCase` (`poster_grande.png`), inspección `nginx.conf` |
-| `RNF-08` | Eficiencia de Desempeño | `1,728` filas `bulk_create`, raíz `sala_id` multi-sala | `TestCase`, introspección esquema PostgreSQL |
+| `RNF-08` | Eficiencia de Desempeño | `1,730` filas `bulk_create`, raíz `sala_id` multi-sala | `TestCase`, introspección esquema PostgreSQL |
 | `RNF-09` | Confiabilidad | Disponibilidad `>= 99.5%`, `restart: unless-stopped` | Monitoreo `/api/v1/health/`, inspección `docker-compose.yml` |
 | `RNF-10` | Confiabilidad | `0%` sobreventa, `0` `40P01`, orden candados, `nowait`/`skip_locked`, índice parcial | `TransactionTestCase` multihilo, inspección `pg_indexes` |
 | `RNF-11` | Confiabilidad | `0%` empalmes agenda (`TSTZRANGE`, `ExclusionConstraint` `btree_gist`) | `TransactionTestCase`, introspección `pg_constraint` |
@@ -251,7 +251,7 @@ Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`),
 
 ### 4.1. Pruebas de Esquema, Integridad y Arquitectura (Backend)
 Se ejecutan en cada corrida de CI sobre PostgreSQL real:
-1. **Contrato de capas (`import-linter`):** Valida el orden estricto `boletos > ventas > inventario > cartelera > cotizaciones > (usuarios, configuracion, recinto, agenda, auditoria, pagos)`.
+1. **Contrato de capas (`import-linter`):** Valida el orden estricto en 7 niveles `apps.boletos > apps.ventas > apps.inventario > apps.cartelera > apps.cotizaciones > (apps.agenda | apps.configuracion | apps.auditoria | apps.pagos) > (apps.recinto | apps.usuarios)`.
 2. **Prueba de FKs entre capas y `on_delete=PROTECT`:** Recorre `apps.get_models()` y falla si alguna `ForeignKey` apunta a una capa superior o usa `CASCADE`/`SET_NULL` en lugar de `PROTECT`.
 3. **Verificación de 14 FKs compuestas y `ExclusionConstraint`:** Consulta `pg_constraint` en PostgreSQL para asegurar que todas las restricciones declaradas con `RunSQL` y `btree_gist` existen físicamente tras `migrate`.
 4. **Inmutabilidad del rol `teatro_app`:** Verifica que intentar `UPDATE` o `DELETE` sobre `registro_auditoria` o `cotizacion_version` con la conexión de aplicación lanza `InsufficientPrivilege`.
@@ -264,16 +264,17 @@ Se ejecutan en cada corrida de CI sobre PostgreSQL real:
 
 ### 4.3. Pruebas de Concurrencia Real (`django.test.TransactionTestCase`)
 * **Por qué `TransactionTestCase`:** `TestCase` envuelve cada prueba en una transacción no confirmada que oculta bloqueos entre hilos. `TransactionTestCase` realiza `COMMIT` reales y permite lanzar hilos concurrentes (`ThreadPoolExecutor`) cerrando conexiones con `django.db.connections.close_all()` en cada hilo trabajador.
-* **5 pruebas obligatorias de alta contención:**
+* **6 pruebas obligatorias de alta contención (`TransactionTestCase`):**
   1. **Apartado simultáneo de la misma butaca (10 hilos):** 1 éxito (`200`) y 9 conflictos (`409 ASIENTO_NO_DISPONIBLE`).
   2. **Bypass de límite `<= 10` boletos en pestañas paralelas (`6 + 6`):** Bloqueo de `Usuario` serializa el conteo; exactamente 1 éxito y 1 `409 LIMITE_BOLETOS`.
   3. **Orden de candados anti-deadlock:** Hilo A aparta `[412, 415]` y Hilo B aparta `[415, 412]` simultáneamente; ambos adquieren `DisponibilidadButaca` en orden `(funcion_id, butaca_id ASC)` con `0` deadlocks (`40P01`).
-  4. **Doble escaneo QR simultáneo (`of=('self',)`):** 2 hilos escanean el mismo boleto al mismo instante; 1 obtiene `200 ACCESO_PERMITIDO` y el otro `409 VALIDACION_EN_CURSO` o `409 BOLETO_YA_USADO`; nunca 2 ingresos.
-  5. **Empalme de agenda concurrente:** 2 hilos aprueban cotizaciones con bloques superpuestos; `ExclusionConstraint` garantiza 1 `200` y 1 `409 CRUCE_AGENDA`.
+  4. **Venta concurrente en Taquilla Física y carrera Web vs Taquilla (`TC-CONC-04`):** 2 cajeros intentando apartar la última localidad disponible simultáneamente (1 éxito y 1 `409`), más carrera entre comprador web y cajero físico por el mismo asiento; garantiza serialización correcta bajo la jerarquía global `Usuario/Cajero -> OrdenCompra -> DisponibilidadButaca`.
+  5. **Doble escaneo QR simultáneo (`of=('self',)`):** 2 hilos escanean el mismo boleto al mismo instante; 1 obtiene `200 ACCESO_PERMITIDO` y el otro `409 VALIDACION_EN_CURSO` o `409 BOLETO_YA_USADO`; nunca 2 ingresos.
+  6. **Empalme de agenda concurrente:** 2 hilos aprueban cotizaciones con bloques superpuestos; `ExclusionConstraint` garantiza 1 `200` y 1 `409 CRUCE_AGENDA`.
 
 ### 4.4. Pruebas de Componentes Frontend (`Vitest` + `React Testing Library`)
 * Ubicadas en `frontend/src/features/**/__tests__/*.test.tsx` y `frontend/src/shared/**/__tests__/*.test.tsx`.
-* Verifican: renderizado del mapa de `1,728` butacas y sus `5` estados + accesibles, pausa del *polling* (`10–15 s`) al perder foco (`document.visibilityState`), recarga de precios al cambiar `fase_venta_id`, advertencia de cambio de función, contador regresivo del carrito, mensajes exactos del escáner QR en `ValidarAccesoPage.tsx` y aceptación LFPDPPP en `RegistroPage.tsx`.
+* Verifican: renderizado del mapa de `1,730` butacas y sus `5` estados + accesibles, pausa del *polling* (`10–15 s`) al perder foco (`document.visibilityState`), recarga de precios al cambiar `fase_venta_id`, advertencia de cambio de función, contador regresivo del carrito, mensajes exactos del escáner QR en `ValidarAccesoPage.tsx` y aceptación LFPDPPP en `RegistroPage.tsx`.
 
 ### 4.5. Pruebas End-to-End (`Playwright`)
 Ubicadas en `frontend/tests/e2e/`, ejecutadas contra el stack completo en Docker (Nginx + Gunicorn + PostgreSQL + Redis + Celery + Mailpit):
@@ -285,7 +286,7 @@ Ubicadas en `frontend/tests/e2e/`, ejecutadas contra el stack completo en Docker
 
 ### 4.6. Pruebas No Funcionales (Carga `k6`, Seguridad Perimetral, Accesibilidad y Contingencia)
 Orientadas a verificar los 43 requisitos de [requisitos-no-funcionales.md](requisitos/requisitos-no-funcionales.md) (`RNF-01`–`RNF-43`):
-1. **Pruebas de carga y latencia (`k6` externo sobre perfil Docker producción local):** Scripts en `backend/tests/load/` (ejecutados vía CLI/contenedor externo `k6` sin alterar `requirements.txt`) simulando rampa de `150–250` usuarios concurrentes en cartelera, lectura/polling de mapa (`1,728` butacas) y ráfaga de puerta QR (`POST /api/v1/boletos/validar/`), validando `p95 < 300 ms` (`RNF-01`, `RNF-03`), `p95 < 200 ms` en QR (`RNF-02`) y `0%` de respuestas `5xx`.
+1. **Pruebas de carga y latencia (`k6` externo sobre perfil Docker producción local):** Scripts en `backend/tests/load/` (ejecutados vía CLI/contenedor externo `k6` sin alterar `requirements.txt`) simulando rampa de `150–250` usuarios concurrentes en cartelera, lectura/polling de mapa (`1,730` butacas) y ráfaga de puerta QR (`POST /api/v1/boletos/validar/`), validando `p95 < 300 ms` (`RNF-01`, `RNF-03`), `p95 < 200 ms` en QR (`RNF-02`) y `0%` de respuestas `5xx`.
 2. **Seguridad perimetral, cabeceras HTTP y throttling:** Verificación contra Nginx local de cabeceras `HSTS`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y `CSP` (`default-src 'none'` en `/media/`) (`RNF-29`), exclusión de TLS `< 1.2` (`RNF-27`), límites de tasa Nginx IP vs `ScopedRateThrottle` (`429` + `Retry-After`) (`RNF-28`), rechazo de JWT/CORS (`RNF-19`) y auditoría de permisos PostgreSQL del rol `teatro_app` (`RNF-23`).
 3. **Accesibilidad `WCAG 2.1 AA/AAA` y responsividad (`360 px`):** Validación automatizada en `Playwright` para viewports `360x800` y `1280x800` verificando `scrollWidth <= innerWidth` (`RNF-32`), legibilidad `>= 12 px` con `tabular-nums`, contraste `#0F172A` sobre `#E58E26` (`RNF-33`) y diferenciación no cromática de los `5` estados + `12` localidades accesibles `♿` (`RNF-34`).
 4. **Simulacro de respaldos y recuperabilidad (`RPO/RTO`):** Prueba de volcado `pg_dump` comprimido y restauración íntegra con `pg_restore` junto con directorio `/media/` verificando `RPO <= 24 h` y `RTO <= 2 h` (`RNF-17`).
@@ -300,7 +301,7 @@ Todas las herramientas avanzadas se instalan exclusivamente en entornos de desar
 * **Frontend — `fast-check` sobre `Vitest`:**
   * Archivo: `frontend/src/shared/components/__tests__/seatmap.pbt.test.ts` y `frontend/src/features/cotizaciones/__tests__/estimacion.pbt.test.ts`.
   * Propiedades verificadas con $\ge 200$ corridas aleatorias por invariante:
-    * La partición de cualquier subconjunto de las `1,728` butacas en `SeccionEvento` (conservación, única, agrupación o `<= 6` rectángulos) nunca genera solapes ni altera el total de butacas habilitadas.
+    * La partición de cualquier subconjunto de las `1,730` butacas en `SeccionEvento` (conservación, única, agrupación o `<= 6` rectángulos) nunca genera solapes ni altera el total de butacas habilitadas.
     * En Palcos, ninguna selección válida divide una cabina individual.
     * Toda selección de carrito en pantalla respeta `1 <= cantidad <= 10` y `total == sum(precio_unitario)`.
 * **Backend — `Hypothesis` integrado en `django.test.TestCase` (sin `pytest`):**
@@ -324,7 +325,7 @@ Todas las herramientas avanzadas se instalan exclusivamente en entornos de desar
 
 ### 5.3. Pruebas Metamórficas (Metamorphic Testing)
 Se implementan como suites dedicadas en `backend/apps/inventario/tests/test_metamorphic.py` y `backend/apps/ventas/tests/test_metamorphic.py`:
-* **MR-1 (Conservación de aforo bajo subdivisión):** Dado un evento comercial con secciones oficiales habilitadas $S$, aplicar cualquier subdivisión rectangular válida en graderías o agrupación de cabinas en Palcos $f(S)$ mantiene invariante el cardinal de `DisponibilidadButaca` creadas al publicar: $|DB(f(S))| = |DB(S)| \le 1728$.
+* **MR-1 (Conservación de aforo bajo subdivisión):** Dado un evento comercial con secciones oficiales habilitadas $S$, aplicar cualquier subdivisión rectangular válida en graderías o agrupación de cabinas en Palcos $f(S)$ mantiene invariante el cardinal de `DisponibilidadButaca` creadas al publicar: $|DB(f(S))| = |DB(S)| \le 1730$.
 * **MR-2 (Aislamiento inter-función):** Apartar o vender $k$ butacas en la función $F_1$ de un evento multi-función produce exactamente el mismo mapa de disponibilidad en la función $F_2$: $\text{Mapa}(F_2 \text{ antes}) \equiv \text{Mapa}(F_2 \text{ después})$.
 * **MR-3 (Invarianza de vencimiento al agregar butacas):** Dada una orden en `APARTADO` con vencimiento $t_0$, agregar nuevas butacas en $t_1 > t_0$ o liberar una butaca dejando $\ge 1$ conserva exactamente $t_0$: $\text{expira\_en}(O') = \text{expira\_en}(O) = t_0$.
 * **MR-4 (Congelamiento de precio por fase en carrito):** Si una butaca $b_1$ se aparta en Fase 1 (precio $p_1$) y luego el reloj avanza a Fase 2 (precio $p_2$) al apartar $b_2$, el total de la orden cumple $\text{Total}(O) = p_1 + p_2$ (nunca $2 p_2$).
@@ -333,7 +334,8 @@ Se implementan como suites dedicadas en `backend/apps/inventario/tests/test_meta
 * **Objetivo:** Garantizar paridad exacta al centavo entre el estimador interactivo del cliente (`frontend/src/features/cotizaciones/utils/estimacion.ts`) y el cálculo oficial del servidor (`CotizacionesService.calcular_estimacion()`).
 * **Mecánica:** Un generador determinista produce 500 casos de prueba en JSON (combinando turnos `MATUTINO`, `VESPERTINO`, `DIA_COMPLETO`, eventos multi-día con bloques `MONTAJE`/`ENSAYO`/`FUNCION` y extras de las 4 unidades `POR_EVENTO`, `POR_DIA`, `POR_TURNO`, `POR_UNIDAD`). Un script ejecuta ambos motores y falla si existe una diferencia $\ge \$0.01\text{ MXN}$ en cualquier caso.
 
-### 5.5. Pruebas de Mutación (`mutmut`)
+### 5.5. Pruebas de Mutación (`mutmut==2.4.4`)
+Se utiliza la versión `mutmut==2.4.4` fijada en `backend/requirements-dev.txt` (última versión estable de la rama 2.x antes de que la 3.0 impusiera dependencia de pytest). Se ejecuta exclusivamente dentro del contenedor Linux de Docker con `--runner "python manage.py test --keepdb"`, garantizando 0 dependencias de pytest y soporte completo de multiprocesamiento.
 * **Alcance focalizado (costo controlado):** Se aplica exclusivamente sobre la lógica crítica de negocio y candados:
   * `backend/apps/ventas/services.py`
   * `backend/apps/cotizaciones/services.py`
@@ -386,7 +388,7 @@ flowchart LR
 
 ### 6.2. Datasets y Seeds Reproducibles
 1. **Seeds oficiales de Django:**
-   * `manage.py seed_teatro`: Siembra la sala única y las `1,728` butacas exactas en 6 secciones oficiales (con asientos accesibles y puertas configuradas).
+   * `manage.py seed_teatro`: Siembra la sala única y las `1,730` butacas exactas en 6 secciones oficiales (con asientos accesibles y puertas configuradas).
    * `manage.py seed_catalogos`: Siembra las 7 categorías fijas, los 3 turnos (`MATUTINO`, `VESPERTINO`, `DIA_COMPLETO`), los servicios extra/infraestructura oficiales con sus `unidad_cobro` y `ConfiguracionSistema` con los valores por defecto.
    * `manage.py seed_demo`: Genera usuarios de prueba para los 4 roles autenticados (`admin@`, `cajero@`, `verificador@`, `usuario1@`, `usuario2@` para pruebas anti-IDOR) más eventos `Comercial`, `Público` y `Privado`.
 2. **Archivos de prueba (*fixtures* binarios y tabulares en `backend/tests/fixtures/`):**
@@ -401,7 +403,7 @@ flowchart LR
 
 ### 7.1. Criterios de Entrada
 * Migraciones limpias aplicadas sobre PostgreSQL 16 con roles `teatro_owner` y `teatro_app` configurados.
-* Comandos `seed_teatro` y `seed_catalogos` ejecutados sin errores (`1,728` butacas verificadas).
+* Comandos `seed_teatro` y `seed_catalogos` ejecutados sin errores (`1,730` butacas verificadas).
 * Análisis estático en verde antes de ejecutar suites pesadas: `ruff check .`, `lint-imports`, `tsc --noEmit`, `eslint .`, `prettier --check .`.
 
 ### 7.2. Criterios de Suspensión y Reanudación

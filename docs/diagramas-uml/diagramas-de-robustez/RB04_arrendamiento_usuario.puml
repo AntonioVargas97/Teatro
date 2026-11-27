@@ -1,4 +1,5 @@
 @startuml RB04_arrendamiento_usuario
+' Alineado con BD v6.2 y Contrato API v1
 skinparam shadowing false
 skinparam defaultTextAlignment center
 skinparam nodesep 35
@@ -23,7 +24,7 @@ control "Rechazar alternativas\n(UC6)" as K_REC
 control "Retener o liberar\nagenda (AgendaService)" as K_AGD
 control "Iniciar pago de\narrendamiento (UC7)" as K_PAG
 control "Determinar mÃ©todos\ndisponibles (UC8)" as K_MET
-control "Generar ficha SPEI\no efectivo (UC9)" as K_FIC
+control "Generar ficha FICHA_SPEI\no efectivo (UC9)" as K_FIC
 control "Crear PaymentIntent\nde tarjeta (UC10)" as K_TAR
 control "Verificar firma y\nregistrar evento" as K_WH
 control "Acreditar pago\nde arrendamiento" as K_ACR

@@ -125,7 +125,7 @@ package "cotizaciones (dominio 1)" {
   }
   class MetodoPagoArrendamiento <<enumeration>> #C5E0B4 {
     TARJETA
-    FICHA_SPEI
+    FICHA_FICHA_FICHA_SPEI
     FICHA_EFECTIVO
   }
   class EstadoPagoArrendamiento <<enumeration>> #C5E0B4 {

@@ -25,13 +25,13 @@ Follow these architectural, performance, and UI conventions when working in `fro
 
 - **Eliminate request waterfalls:** Fetch independent endpoints concurrently with `Promise.all(...)` (e.g., event detail + seat availability + pricing sections).
 - **Lazy-load heavy feature routes:** Use `React.lazy` + `Suspense` for heavy optional views (`@fullcalendar/react` in `AdminAgendaSolicitudesPage.tsx`, `html5-qrcode` in `ValidarAccesoPage.tsx`) to keep the public cartelera bundle fast.
-- **O(1) lookups on 1,728 seats:** Index seat statuses and selected seats in `Map` / `Set` keyed by `butaca_id` instead of calling `.find()` / `.includes()` inside loops over 1,728 nodes.
+- **O(1) lookups on 1,730 seats:** Index seat statuses and selected seats in `Map` / `Set` keyed by `butaca_id` instead of calling `.find()` / `.includes()` inside loops over 1,730 nodes.
 - **Keep `React.memo` effective:** Pass primitive props (status string, selected boolean, price) and stable callbacks (`useCallback` + functional `setState(prev => ...)`); avoid inline object/array literals on memoized seat components and never declare components inside other components.
 - **Derived state & effects:** Compute derived values (totals, counts, remaining seats, button disabled flags) directly during render—never mirror them in `useEffect` + `useState`. Use lazy `useState(() => ...)` for expensive initial computations and ternary (`cond ? <A /> : null`) instead of `count && <A />` for numeric conditionals.
 
 ## 4. Feature-Specific Conventions
 
-- **1,728-Seat Map (`SeleccionButacasPage.tsx`, `MapaAsientos.tsx`, `TaquillaPanel.tsx`):**
+- **1,730-Seat Map (`SeleccionButacasPage.tsx`, `MapaAsientos.tsx`, `TaquillaPanel.tsx`):**
   - Synchronize real-time availability via lightweight HTTP **polling every 10–15s** (automatically paused when `document.visibilityState !== "visible"`).
   - Visually distinguish all 5 uppercase seat states (`DISPONIBLE`, `APARTADA`, `VENDIDA`, `BLOQUEO_TECNICO`, `CORTESIA`) plus wheelchair/companion accessible seats.
   - Show the section's door or access point (`acceso_puerta`) on the map when it is configured. A seat without a `DisponibilidadButaca` row belongs to a disabled section and is painted as such.

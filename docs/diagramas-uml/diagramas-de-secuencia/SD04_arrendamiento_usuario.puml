@@ -1,4 +1,5 @@
 @startuml SD04_arrendamiento_usuario
+' Alineado con BD v6.2 y Contrato API v1
 skinparam shadowing false
 skinparam sequenceMessageAlign left
 skinparam responseMessageBelowArrow true
@@ -33,15 +34,15 @@ U -> UI : Abre formulario de solicitud de renta
 UI -> CFG_CTL ++ : GET /api/v1/configuracion/catalogos/
 CFG_CTL -> E_CFG : leer turnos, tarifas base y extras vigentes
 CFG_CTL --> UI -- : 200 {turnos, extras}
-U -> UI : Captura evento, modalidad, fechas/bloques, extras y asistentes (<= 1,728)
+U -> UI : Captura evento, modalidad, fechas/bloques, extras y asistentes (<= 1,730)
 UI -> COT_CTL ++ : POST /api/v1/cotizaciones/estimaciones/ {bloques, extras, asistentes_estimados, modalidad}
 COT_CTL --> UI -- : 200 {desglose, subtotal_referencial}
 U -> UI : Envía solicitud de cotización
 UI -> COT_CTL ++ : POST /api/v1/cotizaciones/ {datos, bloques, extras}
-alt [aforo <= 1,728 y bloques válidos]
+alt [aforo <= 1,730 y bloques válidos]
   COT_CTL -> E_COT : crear en EN_REVISION (sin bloquear agenda aún)
   COT_CTL --> UI : 201 {cotizacion_id, estado: EN_REVISION, desglose}
-else [datos inválidos o aforo > 1,728]
+else [datos inválidos o aforo > 1,730]
   COT_CTL --> UI -- : 400 DATOS_INVALIDOS
 end
 opt [póster opcional en solicitud]
@@ -84,7 +85,7 @@ break [ficha bloqueada en últimas 48 h pre-D-21 o sobre tope efectivo]
   COT_CTL --> UI : 409 METODO_NO_DISPONIBLE {metodos_disponibles}
 end
 alt [metodo_pago == TARJETA]
-  COT_CTL -> ST ++ : crear PaymentIntent (metadata.modulo='cotizacion')
+  COT_CTL -> ST ++ : crear PaymentIntent (metadata.modulo='COTIZACIONES')
   ST --> COT_CTL -- : client_secret
   COT_CTL -> E_PAG : registrar pago PENDIENTE
   COT_CTL --> UI : 201 {pago_id, importe, client_secret}
