@@ -101,7 +101,7 @@ components:
 
 La identidad visual del ecosistema traduce la presencia cívica y arquitectónica del recinto diseñado por el Arq. Abraham Zabludovsky a tres caras especializadas con un ADN compartido: el **Portal Público** (`Persuade / Experience`), la **Consola Operativa de Administración** (`Operate — Backstage en Arena Cálida`) y el **Puesto de Puerta QR** (`Operate — Azul Nocturno del Golfo`).
 
-En el portal público, `Cinzel` domina los hitos escénicos y `Manrope` sostiene la lectura operativa de cartelera, precios y compra sobre el plano oficial de **1,730 butacas en 6 secciones** (`+12` accesibles `♿`). En las superficies operativas internas (`admin/*.html` y `verificador.html`), la jerarquía se invierte hacia la velocidad tabular (`tabular-nums`), contraste WCAG 2.1 AA/AAA estricto y ausencia de ruido visual, manteniendo inconfundiblemente la misma familia cromática del Teatro.
+En el portal público, `Cinzel` domina los hitos escénicos y `Manrope` sostiene la lectura operativa de cartelera, precios y compra sobre el plano oficial de **1,730 butacas en 6 secciones** (incluyendo 12 accesibles ♿). En las superficies operativas internas (`admin/*.html` y `verificador.html`), la jerarquía se invierte hacia la velocidad tabular (`tabular-nums`), contraste WCAG 2.1 AA/AAA estricto y ausencia de ruido visual, manteniendo inconfundiblemente la misma familia cromática del Teatro.
 
 **Key Characteristics:**
 - Ecosistema cohesivo en torno a `Azul Golfo` (`#1E3A8A`) y `Arena Arquitectónica` (`#D9CBB8`) para público, backstage y puerta QR.
@@ -183,7 +183,7 @@ Contenedores operativos contenidos (`12px`–`16px`: `rounded-xl` / `rounded-2xl
 
 - **Buttons:** Cápsula `9999px`. Público primario: `bg-accent text-white`; Operativo Admin/Verificador: `bg-primary text-white` (`10.36:1`) o `bg-accent text-base-text` (`7.0:1`).
 - **Tables (Consola Admin):** Cabecera cálida `bg-[#EFECE4] text-golfo-deep` con divisores `divide-arena-border`, cifras con `.tabular-nums`, sin cabeceras negras sólidas.
-- **Signature Component — Mapa Interactivo de Butacas (`img/plano-teatro.svg`):** **6 secciones oficiales** (`Luneta` `#DC2626` · 566, `Platea` `#EA580C` · 144, `Mezzanine` `#1E3A8A` · 291, `Primer Piso` `#15803D` · 287, `Segundo Piso` `#7E22CE` · 386, `Palcos` `#0284C7` · 56) sumando **1,730 localidades** (+ **12 accesibles `♿`**) con zoom semántico LOD (`>= 1.7x`) y 4 modos (`public`, `taquilla`, `admin-sala`, `configurator`).
+- **Signature Component — Mapa Interactivo de Butacas (`img/plano-teatro.svg`):** **6 secciones oficiales** (`Luneta` `#DC2626` · 566, `Platea` `#EA580C` · 144, `Mezzanine` `#1E3A8A` · 291, `Primer Piso` `#15803D` · 287, `Segundo Piso` `#7E22CE` · 386, `Palcos` `#0284C7` · 56) sumando **1,730 localidades** (incluyendo **12 accesibles `♿`**) con zoom semántico LOD (`>= 1.7x`) y 4 modos (`public`, `taquilla`, `admin-sala`, `configurator`).
 - **Signature Component — Tarjeta-Pase Verificador QR (`verificador.html`):** Bandeja superior segmentada con ícono SVG inequívoco, banda de estado (`VALIDO`, `YA_UTILIZADO`, `OTRA_FUNCION`, `DEMASIADO_PRONTO`, `FUNCION_CONCLUIDA`, `INVALIDO`), lectura ampliada de Sección/Fila/Asiento y telemetría de ingreso.
 
 ## Do's and Don'ts

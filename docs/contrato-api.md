@@ -189,7 +189,7 @@ En DIRECTO se mueve el bloqueo de función atómicamente. En ARRENDAMIENTO la fu
 | Entero positivo, horas | `prereserva_h` (48), `propuesta_h` (48), `revision_extemporanea_h` (72) |
 | Entero positivo, días naturales | `limite_publicacion_d` (15), `recordatorio_d` (7), `corte_saldo_d` (21), `margen_50_50_d` (9), `reprogramacion_minima_d` (21) |
 | Entero positivo, días hábiles | `sla_respuesta_dh` (3), `sla_atraso_dh` (5), mayor que el plazo de respuesta |
-| Decimal de 0.00 a 100.00 / entero de 1 a 10 | `retencion_cancelacion_pct` ("50.00") / `limite_boletos` (10) |
+| Decimal de 0.00 a 100.00 / entero ≥ 1 (por defecto 10) | `retencion_cancelacion_pct` ("50.00") / `limite_boletos` (10) |
 
 ## 4. Inventario, carrito y cobro
 
@@ -330,7 +330,7 @@ En reconciliación el campo multipart se llama `archivo`. También se admite `{"
 
 | Método y ruta | Acceso y entrada | Respuesta y reglas |
 | :--- | :--- | :--- |
-| `POST cotizaciones/` | `USUARIO`; `nombre_evento, categoria_id, modalidad, contacto_nombre, contacto_telefono, contacto_correo, asistentes_estimados, es_multidia, bloques, extras` en JSON. El póster opcional se adjunta por separado. | `201` con `cotizacion_id, estado: EN_REVISION` y desglose estimado. Más de 1,730 asistentes o bloques inválidos devuelven `400`. La recepción de la solicitud aún deja libre la agenda. |
+| `POST cotizaciones/` | `USUARIO`; `nombre_evento, categoria_id, modalidad, contacto_nombre, contacto_telefono, contacto_correo, asistentes_estimados, es_multidia, bloques, extras` en JSON.  | `201` con `cotizacion_id, estado: EN_REVISION` y desglose estimado. Más de 1,730 asistentes o bloques inválidos devuelven `400`. La recepción de la solicitud aún deja libre la agenda. |
 | `POST cotizaciones/{id}/versiones/` | `ADMIN`; `monto_oficial` y `nota` opcional. | `201` con la versión nueva y su número consecutivo. Cada ajuste crea una fila en `cotizacion_version`; las versiones anteriores se conservan. |
 | `POST cotizaciones/{id}/aprobar/` | `ADMIN`; `monto_oficial` para una solicitud en revisión, y `asistentes_acordados` opcional en la entrada, que se guarda en `cotizacion_parametros`. Crea la versión vigente en `cotizacion_version` (o toma la existente) y la marca como aprobada. | `200` con `estado: PRE_RESERVADO, monto_oficial, esquema_pago, monto_anticipo, saldo, pre_reserva_expira_en` y el vencimiento del saldo cuando aplique. Un traslape devuelve `409 CRUCE_AGENDA` sin aprobar parcialmente. |
 | `POST cotizaciones/{id}/alternativas/` | `ADMIN`; de una a tres opciones de fecha y turno libres y mutuamente disjuntas. | `200` con `estado: PROPUESTA_RETENIDA`, opciones y vencimiento. Cantidad inválida: `400`. Traslape: `409 CRUCE_AGENDA`. |
@@ -338,7 +338,7 @@ En reconciliación el campo multipart se llama `archivo`. También se admite `{"
 | `POST cotizaciones/estimaciones/` | U | {bloques,extras,asistentes_estimados,modalidad} → 200 desglose y subtotal referencial. |
 | `GET cotizaciones/ y cotizaciones/{id}/` | U propio, A global | Lista por estado o detalle, 200. A recibe indicadores de atraso y proximidad de fecha. |
 | `POST cotizaciones/{id}/rechazar/` | A | {motivo} → 200 estado y liberación de retenciones relacionadas. |
-| `POST cotizaciones/{id}/pagos/` | U propio | {concepto,metodo_pago} con clave de idempotencia → 201 {pago_id,importe,estado,expira_en,client_secret?,instrucciones_ficha?}. Concepto ANTICIPO_50, SALDO_50 o TOTAL_100; metodo_pago TARJETA, FICHA_EFECTIVO o SPEI según disponibilidad. |
+| `POST cotizaciones/{id}/pagos/` | U propio | {concepto,metodo_pago} con clave de idempotencia → 201 {pago_id,importe,estado,expira_en,client_secret?,instrucciones_ficha?}. Concepto ANTICIPO_50, SALDO_50 o TOTAL_100; metodo_pago TARJETA, FICHA_EFECTIVO o FICHA_SPEI según disponibilidad. |
 | `POST cotizaciones/{id}/resolver-pago-extemporaneo/` | A | {decision,motivo} → 200 detalle. ACEPTAR revalida disponibilidad; RECHAZAR tramita reembolso técnico íntegro. |
 | `POST cotizaciones/{id}/cambios/` | U propio | {tipo,motivo,bloques_propuestos?} → 201 petición. Tipo CANCELACION o REPROGRAMACION. |
 | `POST cotizaciones/{id}/cambios/{cambio_id}/resolver/` | A | {decision,motivo,liberar_agenda?,bloques?} → 200 estado, efecto en agenda y tratamiento administrativo. |

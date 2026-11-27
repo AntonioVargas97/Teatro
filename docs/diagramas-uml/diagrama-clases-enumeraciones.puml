@@ -107,6 +107,7 @@ package "cotizaciones (dominio 1)" {
     RECHAZADA
     CANCELADO_POR_ARRENDATARIO
     CANCELADO_POR_TEATRO
+    CANCELADA_REPROGRAMABLE
     FINALIZADO
   }
   class EsquemaPago <<enumeration>> #C5E0B4 {
@@ -186,6 +187,7 @@ package "cartelera (dominio 2)" {
     OPERACION_SIN_CARTELERA
     CANCELADO_POR_ARRENDATARIO
     CANCELADO_POR_TEATRO
+    CANCELADA_REPROGRAMABLE
     FINALIZADO
   }
   class EstadoFuncion <<enumeration>> #D9C9EC {
@@ -223,6 +225,7 @@ package "ventas (dominio 4)" {
     PAGADA
     EXPIRADA
     REEMBOLSADA_AUTOMATICA
+    ANULADA
   }
   class MetodoPagoOrden <<enumeration>> #F8CBAD {
     TARJETA_STRIPE

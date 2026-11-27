@@ -1,4 +1,5 @@
 @startuml ME04_Butaca_QR
+' Alineado con BD v6.2 y Contrato API v1
 ' Actualizado 2026-11-26: alineado con BD v6.2. Estados financieros derivados (no columnas), PagoOrden/PagoArrendamiento, webhook_stripe, contingencia_funcion por tabla, cotizacion_version al aprobar, asignacion_butaca para el inventario.
 hide empty description
 skinparam state {

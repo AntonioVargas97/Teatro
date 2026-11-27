@@ -14,7 +14,7 @@ Toda prueba diseñada o ejecutada debe alinearse estrictamente con los artefacto
 | Reglas de negocio y exclusiones | [alcance.md](alcance.md) | Plazos (`10+5 min`, `48 h`, `72 h`, `> 30 d / D-21`, `-30 min / 0 min`, `-2 h`, `24 h`), piso `>= $100.00 MXN`, límite `<= 10` boletos, exclusiones de alcance. |
 | Arquitectura y concurrencia | [arquitectura.md](arquitectura.md) | Capas ADP, `services.py`, orden de candados (`NOWAIT`/`SKIP LOCKED`), RBAC/anti-IDOR, SPAs `/` y `/gestion/`. |
 | Modelo de datos v6.2 | [modelo-datos.md](modelo-datos.md) | 44 tablas, 14 FKs compuestas (`RunSQL`), `ExclusionConstraint` (`btree_gist`), `on_delete=PROTECT`, roles `teatro_owner` / `teatro_app`. |
-| Máquinas de estado | [maquinas-de-estado.md](maquinas-de-estado.md) | 43 transiciones oficiales (`T-1.1`–`T-1.17`, `T-2.1`–`T-2.10`, `T-3.1`–`T-3.8`, `T-4.1`–`T-4.8`). |
+| Máquinas de estado | [maquinas-de-estado.md](maquinas-de-estado.md) | 44 transiciones oficiales (`T-1.1`–`T-1.17`, `T-2.1`–`T-2.10`, `T-3.1`–`T-3.8`, `T-4.1`–`T-4.8`). |
 | Contrato de API | [contrato-api.md](contrato-api.md) | Rutas `/api/v1/`, esquemas JSON, códigos HTTP, códigos `code` estables y `Idempotency-Key`. |
 | Stack y exclusiones técnicas | [stack-tecnologico.md](stack-tecnologico.md) | Django 5.2 `TestCase`/`TransactionTestCase` (sin `pytest`), PostgreSQL 16 (sin SQLite), Vitest, Playwright, `ruff`, `import-linter`, `k6` (QA). |
 | Requerimientos funcionales | [requisitos-funcionales.md](requisitos/requisitos-funcionales.md) | 103 requerimientos atómicos (`RF-01` a `RF-103`) distribuidos en 10 módulos. |
@@ -53,7 +53,7 @@ En correspondencia con [alcance.md](alcance.md) §4 y [stack-tecnologico.md](sta
 
 ## 3. Matriz de Trazabilidad de Requisitos (RTM)
 
-Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`), los **43 requerimientos no funcionales** (`RNF-01`–`RNF-43`), las **43 transiciones oficiales** (`T-1.1`–`T-4.8`) y los **10 diagramas de secuencia** (`SD01`–`SD10`) hacia los niveles y técnicas de prueba.
+Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`), los **43 requerimientos no funcionales** (`RNF-01`–`RNF-43`), las **44 transiciones oficiales** (`T-1.1`–`T-4.8`) y los **10 diagramas de secuencia** (`SD01`–`SD10`) hacia los niveles y técnicas de prueba.
 
 ### 3.1. Módulo 1 — Configuración Administrativa y Catálogos Base (`SD08`)
 | RF | Transiciones / Reglas | Endpoint(s) | Niveles y Técnicas de Prueba |
@@ -94,7 +94,7 @@ Mapeo exhaustivo de los **103 requerimientos funcionales** (`RF-01`–`RF-103`),
 | RF | Transiciones / Reglas | Endpoint(s) | Niveles y Técnicas de Prueba |
 | :--- | :--- | :--- | :--- |
 | `RF-24` | Extras por `unidad_cobro`, montaje/ensayos sin cargo extra | `GET configuracion/catalogos/`, `POST cotizaciones/estimaciones/` | `TestCase`, `Hypothesis`, **`Diferencial` (TS vs Python)** |
-| `RF-25` | `asistentes <= 1,730`, multi-día, sin bloquear agenda | `POST cotizaciones/`, `PUT cotizaciones/{id}/poster/` | `TestCase`, `Schemathesis`, `Playwright` (`cotizacion.spec.ts`) |
+| `RF-25` | `asistentes <= 1,730`, multi-día, sin bloquear agenda | `POST cotizaciones/` | `TestCase`, `Schemathesis`, `Playwright` (`cotizacion.spec.ts`) |
 | `RF-26` | Anti-IDOR propietario + PDF comprobante | `GET cotizaciones/`, `GET cotizaciones/{id}/`, `GET cotizaciones/{id}/comprobante/` | `TestCase` (ReportLab PDF + `403` ajeno), `Red Team` |
 | `RF-27` | SLA `3/5 días hábiles` lun–vie `America/Mexico_City` | `GET cotizaciones/` + tarea `actualizar_sla_cotizaciones` | `TestCase` (`timezone.now` saltando fines de semana), `Evals` |
 | `RF-28` | `T-1.4` (`EXPIRADA_POR_FECHA`) | Tarea Celery Beat `actualizar_sla_cotizaciones` | `TestCase` (fecha estimada pasada) |

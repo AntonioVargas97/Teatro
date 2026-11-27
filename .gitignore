@@ -1,5 +1,6 @@
 # Scripts temporales y scratch
 scratch/
+migracion-front/
 
 # Variables de entorno y secretos locales
 .env
